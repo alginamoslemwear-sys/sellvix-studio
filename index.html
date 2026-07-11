@@ -2332,24 +2332,31 @@ function renderKeuanganKPI(incomeSummary, profitResult, adsData, danaPending, pe
   const totalOmzetSeries = Object.values(bySeries).reduce((s,v)=>s+v.omzet,0); // basis Margin, tetap dari order matched
   const margin = totalOmzetSeries ? (labaBersih/totalOmzetSeries*100) : 0;
 
+  const adminShopeeVal = Math.abs((incomeSummary.biaya_administrasi||0)+(incomeSummary.biaya_layanan||0)+(incomeSummary.biaya_proses_pesanan||0));
+  const komisiAffiliateVal = Math.abs(incomeSummary.biaya_komisi_ams||0);
+  // Total Pendapatan = kebalikan rumus "Total yang Dilepas" Shopee (Pendapatan - Biaya = Dilepas)
+  // Asumsi ongkos kirim net Rp0 (biasanya benar, lihat kartu Selisih Ongkos Kirim untuk pengecekan)
+  const totalPendapatan = totalPenghasilanBersih + adminShopeeVal + komisiAffiliateVal;
+
   const cards = [
     // Baris 1
     {label:"Omzet Kotor", value:`Rp ${Math.round(omzetKotor).toLocaleString("id-ID")}`, sub:"Selesai + Sedang Dikirim"},
-    {label:"Pesanan Selesai", value:penjualanStats.selesaiCount, sub:`Rp ${Math.round(penjualanStats.selesaiValue).toLocaleString("id-ID")}`},
-    {label:"Pesanan Sedang Dikirim", value:penjualanStats.sedangDikirimCount, sub:`Rp ${Math.round(penjualanStats.sedangDikirimValue).toLocaleString("id-ID")}`},
-    {label:"Dana Pending", value:`Rp ${Math.round(danaPending.total).toLocaleString("id-ID")}`, sub:`${danaPending.count} order, belum dirilis Shopee`},
+    {label:"Pesanan Selesai", value:`Rp ${Math.round(penjualanStats.selesaiValue).toLocaleString("id-ID")}`, sub:`Dana yang sudah dirilis`},
+    {label:"Pesanan Sedang Dikirim", value:`Rp ${Math.round(penjualanStats.sedangDikirimValue).toLocaleString("id-ID")}`, sub:`Dana yang belum terselesaikan`},
+    {label:"Total Pendapatan", value:`Rp ${Math.round(totalPendapatan).toLocaleString("id-ID")}`, sub:"Total dana yang sudah dirilis"},
     // Baris 2
-    {label:"Admin Shopee", value:`Rp ${Math.round(Math.abs((incomeSummary.biaya_administrasi||0)+(incomeSummary.biaya_layanan||0)+(incomeSummary.biaya_proses_pesanan||0))).toLocaleString("id-ID")}`},
-    {label:"Komisi Affiliate (AMS)", value:`Rp ${Math.round(Math.abs(incomeSummary.biaya_komisi_ams||0)).toLocaleString("id-ID")}`},
-    {label:"Biaya Iklan", value:`Rp ${Math.round(totalBiayaIklan).toLocaleString("id-ID")}`, warn: !adsData.hasData},
-    {label:"Selisih Ongkos Kirim (Retur)", value:`Rp ${Math.round(Math.abs(incomeSummary.ongkir_retur||0)).toLocaleString("id-ID")}`, warn: Math.abs(incomeSummary.ongkir_retur||0) > 0},
+    {label:"Admin Shopee", value:`Rp ${Math.round(adminShopeeVal).toLocaleString("id-ID")}`, sub:"Administrasi, Layanan & Proses Pesanan"},
+    {label:"Komisi Affiliate (AMS)", value:`Rp ${Math.round(komisiAffiliateVal).toLocaleString("id-ID")}`, sub:"Komisi program affiliate"},
+    {label:"Biaya Iklan", value:`Rp ${Math.round(totalBiayaIklan).toLocaleString("id-ID")}`, warn: !adsData.hasData, sub:"Dari Data Iklan periode yang sama"},
+    {label:"Selisih Ongkos Kirim (Retur)", value:`Rp ${Math.round(Math.abs(incomeSummary.ongkir_retur||0)).toLocaleString("id-ID")}`, warn: Math.abs(incomeSummary.ongkir_retur||0) > 0, sub:"Biasanya Rp0 — muncul kalau ada retur"},
     // Baris 3
     {label:"Penghasilan Kotor", value:`Rp ${Math.round(penghasilanKotor).toLocaleString("id-ID")}`, sub:"Penghasilan Bersih + Sedang Dikirim"},
-    {label:"Penghasilan Bersih", value:`Rp ${Math.round(totalPenghasilanBersih).toLocaleString("id-ID")}`},
-    {label:"HPP", value:`Rp ${totalHpp.toLocaleString("id-ID")}`},
-    {label:"Laba Bersih", value:`Rp ${Math.round(labaBersih).toLocaleString("id-ID")}`, warn: labaBersih<0},
+    {label:"Penghasilan Bersih", value:`Rp ${Math.round(totalPenghasilanBersih).toLocaleString("id-ID")}`, sub:"Total Pendapatan − Admin Shopee − Komisi Affiliate"},
+    {label:"HPP", value:`Rp ${totalHpp.toLocaleString("id-ID")}`, sub:"Qty terjual × HPP/pcs"},
+    {label:"Laba Bersih", value:`Rp ${Math.round(labaBersih).toLocaleString("id-ID")}`, warn: labaBersih<0, sub:"Penghasilan Bersih − HPP − Biaya Iklan"},
     // Baris 4
-    {label:"Margin", value:`${margin.toFixed(1)}%`, warn: margin<10},
+    {label:"Dana Pending", value:`Rp ${Math.round(danaPending.total).toLocaleString("id-ID")}`, sub:`Dana belum dirilis Shopee`},
+    {label:"Margin", value:`${margin.toFixed(1)}%`, warn: margin<10, sub:"Laba Bersih ÷ Omzet Kotor"},
     {label:"Order Tercocokkan", value:`${matchRate.toFixed(1)}%`, sub:`${matched}/${matched+unmatched} order`, warn: matchRate<70},
   ];
   document.getElementById("keuanganKpiGrid").innerHTML = cards.map(c=>`
