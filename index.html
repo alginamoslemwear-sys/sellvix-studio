@@ -132,6 +132,54 @@
   .kpi-grid{
     display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:28px;
   }
+  .kpi-grid-4{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px;
+  }
+  @media(max-width:960px){
+    .kpi-grid-4{ grid-template-columns:repeat(2,1fr); }
+  }
+
+  /* ── Shopee-style date range picker ── */
+  .daterange-wrap{ position:relative; display:inline-block; margin-bottom:22px; }
+  .daterange-btn{
+    display:flex; align-items:center; gap:8px; padding:9px 16px;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    font-size:13.5px; font-weight:600; color:var(--text); cursor:pointer;
+  }
+  .daterange-btn:hover{ border-color:var(--blue); }
+  .daterange-panel{
+    position:absolute; top:calc(100% + 8px); left:0; z-index:50;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    box-shadow:var(--shadow); display:flex; overflow:hidden; min-width:640px;
+  }
+  .daterange-presets{
+    width:170px; border-right:1px solid var(--border); padding:10px 0; flex-shrink:0;
+  }
+  .preset-item{
+    padding:11px 20px; font-size:13.5px; color:var(--text); cursor:pointer;
+  }
+  .preset-item:hover{ background:var(--surface-2); }
+  .preset-item.active{ color:var(--blue); font-weight:700; background:var(--blue-pale); }
+  .daterange-calendars{
+    display:flex; align-items:flex-start; padding:16px 20px; gap:18px; position:relative;
+  }
+  .cal-nav{ display:flex; align-items:center; }
+  .cal-arrow{
+    cursor:pointer; font-size:20px; color:var(--text-soft); padding:4px 8px; user-select:none;
+  }
+  .cal-arrow:hover{ color:var(--blue); }
+  .cal-month{ width:230px; }
+  .cal-month-title{ text-align:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; color:var(--navy); margin-bottom:12px; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+  .cal-dow{ text-align:center; font-size:11px; font-weight:700; color:var(--text-soft); padding:4px 0; }
+  .cal-day{
+    text-align:center; font-size:12.5px; padding:7px 0; border-radius:6px; cursor:pointer; color:var(--text);
+  }
+  .cal-day:hover{ background:var(--surface-2); }
+  .cal-day.disabled{ color:#C7D1E0; cursor:default; pointer-events:none; }
+  .cal-day.in-range{ background:var(--blue-pale); border-radius:0; }
+  .cal-day.selected{ background:var(--blue); color:#fff; font-weight:700; }
+  .cal-day.today-marker{ color:var(--danger); font-weight:700; }
   .kpi-card{
     background:var(--surface); border:1px solid var(--border);
     padding:18px 20px 16px; position:relative; overflow:hidden; box-shadow:var(--shadow);
@@ -319,13 +367,32 @@
 
     <div class="log-panel" id="iklanLog"></div>
 
-    <div class="filter-row">
-      <span style="font-size:13px; color:var(--text-soft); font-weight:600; margin-right:4px;">Periode:</span>
-      <div class="chip active" data-range="today" onclick="setIklanRange('today', this)">Hari Ini</div>
-      <div class="chip" data-range="7" onclick="setIklanRange('7', this)">7 Hari</div>
-      <div class="chip" data-range="30" onclick="setIklanRange('30', this)">30 Hari</div>
-      <div class="chip" data-range="month" onclick="setIklanRange('month', this)">Bulan Ini</div>
-      <div class="chip" data-range="all" onclick="setIklanRange('all', this)">Semua</div>
+    <div class="daterange-wrap">
+      <button class="daterange-btn" onclick="toggleIklanRangePicker()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span id="iklanRangeLabel">Pilih Periode</span>
+      </button>
+      <div class="daterange-panel" id="iklanRangePanel" style="display:none;">
+        <div class="daterange-presets">
+          <div class="preset-item" onclick="applyIklanPreset('today', this)">Hari Ini</div>
+          <div class="preset-item" onclick="applyIklanPreset('yesterday', this)">Kemarin</div>
+          <div class="preset-item" onclick="applyIklanPreset('7', this)">1 Minggu Terakhir</div>
+          <div class="preset-item" onclick="applyIklanPreset('30', this)">1 Bulan Terakhir</div>
+          <div class="preset-item" onclick="applyIklanPreset('90', this)">3 Bulan Terakhir</div>
+          <div class="preset-item" onclick="applyIklanPreset('month', this)">Bulan Ini</div>
+          <div class="preset-item" onclick="applyIklanPreset('all', this)">Semua Data</div>
+        </div>
+        <div class="daterange-calendars">
+          <div class="cal-nav">
+            <span class="cal-arrow" onclick="shiftCalMonth(-1)">‹</span>
+          </div>
+          <div class="cal-month" id="calMonthLeft"></div>
+          <div class="cal-month" id="calMonthRight"></div>
+          <div class="cal-nav">
+            <span class="cal-arrow" onclick="shiftCalMonth(1)">›</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="iklanEmptyState" class="empty-state">
@@ -335,7 +402,7 @@
 
     <div id="iklanContent" style="display:none;">
 
-      <div class="kpi-grid" id="iklanKpiGrid"></div>
+      <div class="kpi-grid-4" id="iklanKpiGrid"></div>
 
       <div class="grid-2">
         <div class="panel cut-corner">
@@ -370,15 +437,12 @@
       <h3>Laporan Custom (Mingguan/Bulanan/Manual)</h3>
       <div class="accent-cut"></div>
       <p style="font-size:12px; color:var(--text-soft); margin-bottom:14px;">
-        Laporan dengan rentang lebih dari 1 hari muncul di sini, terpisah dari filter di atas.
+        Laporan dengan rentang lebih dari 1 hari tersimpan di sini. Pilih untuk langsung menampilkannya di atas.
       </p>
-      <div class="filter-row" id="iklanPeriodeRow" style="display:none; margin-bottom:14px;">
+      <div class="filter-row" id="iklanPeriodeRow" style="display:none;">
         <select id="iklanPeriodeSelect" onchange="loadCustomReport(this.value)" style="padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface); font-size:13px; font-weight:600; color:var(--text);"></select>
       </div>
       <div id="customReportEmpty" style="font-size:13px; color:var(--text-soft);">Belum ada laporan custom yang di-upload.</div>
-      <div id="customReportContent" style="display:none;">
-        <div class="kpi-grid" id="customKpiGrid" style="margin-bottom:0;"></div>
-      </div>
     </div>
 
   </div><!-- /#page-iklan -->
@@ -759,10 +823,13 @@ function parseAdsFile(text){
       kode_produk: String(obj["Kode Produk"] ?? ""),
       dilihat: parseNum(obj["Dilihat"]),
       klik: parseNum(obj["Jumlah Klik"]),
+      add_to_cart: parseNum(obj["Add to Cart"]),
       konversi: parseNum(obj["Konversi"]),
       produk_terjual: parseNum(obj["Produk Terjual"]),
       omzet: parseNum(obj["Omzet Penjualan"]),
       biaya: parseNum(obj["Biaya"]),
+      voucher_amount: parseNum(obj["Voucher Amount"]),
+      vouchered_sales: parseNum(obj["Vouchered Sales"]),
     };
   });
 
@@ -787,6 +854,9 @@ function computeAdsSummary(ads){
   const totalKlik = ads.reduce((s,a)=>s+a.klik,0);
   const totalKonversi = ads.reduce((s,a)=>s+a.konversi,0);
   const totalTerjual = ads.reduce((s,a)=>s+a.produk_terjual,0);
+  const totalAddToCart = ads.reduce((s,a)=>s+a.add_to_cart,0);
+  const totalVoucher = ads.reduce((s,a)=>s+a.voucher_amount,0);
+  const totalVoucheredSales = ads.reduce((s,a)=>s+a.vouchered_sales,0);
 
   const bySeries = {};
   for(const a of ads){
@@ -801,7 +871,9 @@ function computeAdsSummary(ads){
   return {
     total_biaya: totalBiaya, total_omzet: totalOmzet, total_dilihat: totalDilihat,
     total_klik: totalKlik, total_konversi: totalKonversi, total_terjual: totalTerjual,
+    total_add_to_cart: totalAddToCart, total_voucher: totalVoucher, total_vouchered_sales: totalVoucheredSales,
     ctr_rata: totalDilihat ? (totalKlik/totalDilihat*100) : 0,
+    cart_rate: totalKlik ? (totalAddToCart/totalKlik*100) : 0,
     roas: totalBiaya ? (totalOmzet/totalBiaya) : 0,
     acos: totalOmzet ? (totalBiaya/totalOmzet*100) : 0,
     by_series: bySeries,
@@ -846,8 +918,17 @@ async function handleIklanFileSelect(event){
       await refreshIklanDashboard();
     } else {
       await db.collection("iklan_reports").doc(parsed.periodeId).set(baseDoc);
-      statusEl.textContent = `✅ ${file.name} disimpan sebagai laporan CUSTOM (${parsed.meta.periode_raw}) — tidak ikut filter harian di atas, lihat di bagian "Laporan Custom" di bawah.`;
+      statusEl.textContent = `✅ ${file.name} disimpan sebagai laporan periode ${parsed.meta.periode_raw}`;
       await refreshCustomReportList();
+
+      // langsung pindahkan date-picker ke periode ini biar tampilan utama nunjukin datanya
+      iklanRangeFrom = parsed.periodeStart;
+      iklanRangeTo = parsed.periodeEnd;
+      currentRangeIklan = "custom";
+      document.querySelectorAll(".preset-item").forEach(p=>p.classList.remove("active"));
+      const fmtLabel = (idStr) => `${idStr.slice(6,8)}/${idStr.slice(4,6)}`;
+      document.getElementById("iklanRangeLabel").textContent = `${fmtLabel(parsed.periodeStart)} - ${fmtLabel(parsed.periodeEnd)}`;
+      await refreshIklanDashboard();
     }
   } catch(err){
     console.error(err);
@@ -857,28 +938,47 @@ async function handleIklanFileSelect(event){
   }
 }
 
-/* ── Filter harian/7hari/30hari/bulan ini (persis pola Data Penjualan) ── */
+/* ── Date range picker ala Shopee: preset list + kalender dua-bulan ── */
 let currentRangeIklan = "today";
+let iklanRangeFrom = null, iklanRangeTo = null; // YYYYMMDD strings, sumber kebenaran untuk query
+let calBaseDate = new Date(); // bulan kiri = calBaseDate, kanan = bulan berikutnya
+let calSelecting = { start:null, end:null }; // Date objects, untuk pilih custom range
 let iklanSeriesChartInstance = null;
 let iklanRoasChartInstance = null;
 
-function setIklanRange(range, el){
-  currentRangeIklan = range;
-  el.parentElement.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
-  el.classList.add("active");
-  refreshIklanDashboard();
+function toggleIklanRangePicker(){
+  const panel = document.getElementById("iklanRangePanel");
+  const willShow = panel.style.display === "none";
+  panel.style.display = willShow ? "flex" : "none";
+  if(willShow) renderCalendars();
 }
+
+document.addEventListener("click", (e) => {
+  const wrap = document.querySelector(".daterange-wrap");
+  if(wrap && !wrap.contains(e.target)){
+    const panel = document.getElementById("iklanRangePanel");
+    if(panel) panel.style.display = "none";
+  }
+});
 
 function getRangeDatesFor(range){
   const today = new Date();
   const fmt = fmtLocalDate;
   if(range === "today") return [fmt(today), fmt(today)];
+  if(range === "yesterday"){
+    const y = new Date(today); y.setDate(y.getDate()-1);
+    return [fmt(y), fmt(y)];
+  }
   if(range === "7"){
     const from = new Date(today); from.setDate(from.getDate()-6);
     return [fmt(from), fmt(today)];
   }
   if(range === "30"){
     const from = new Date(today); from.setDate(from.getDate()-29);
+    return [fmt(from), fmt(today)];
+  }
+  if(range === "90"){
+    const from = new Date(today); from.setDate(from.getDate()-89);
     return [fmt(from), fmt(today)];
   }
   if(range === "month"){
@@ -888,8 +988,112 @@ function getRangeDatesFor(range){
   return ["00000000","99999999"];
 }
 
+const PRESET_LABEL = {
+  today:"Hari Ini", yesterday:"Kemarin", "7":"1 Minggu Terakhir",
+  "30":"1 Bulan Terakhir", "90":"3 Bulan Terakhir", month:"Bulan Ini", all:"Semua Data"
+};
+
+function applyIklanPreset(range, el){
+  currentRangeIklan = range;
+  const [from, to] = getRangeDatesFor(range);
+  iklanRangeFrom = from; iklanRangeTo = to;
+  document.querySelectorAll(".preset-item").forEach(p=>p.classList.remove("active"));
+  if(el) el.classList.add("active");
+  calSelecting = {start:null, end:null};
+  document.getElementById("iklanRangeLabel").textContent = PRESET_LABEL[range] || range;
+  document.getElementById("iklanRangePanel").style.display = "none";
+  refreshIklanDashboard();
+}
+
+function shiftCalMonth(dir){
+  calBaseDate.setMonth(calBaseDate.getMonth()+dir);
+  renderCalendars();
+}
+
+function renderCalendars(){
+  const left = new Date(calBaseDate.getFullYear(), calBaseDate.getMonth(), 1);
+  const right = new Date(calBaseDate.getFullYear(), calBaseDate.getMonth()+1, 1);
+  document.getElementById("calMonthLeft").innerHTML = renderMonthGrid(left);
+  document.getElementById("calMonthRight").innerHTML = renderMonthGrid(right);
+}
+
+function renderMonthGrid(monthDate){
+  const monthNames = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const dow = ["M","S","S","R","K","J","S"]; // Minggu Senin Selasa Rabu Kamis Jumat Sabtu
+  const y = monthDate.getFullYear(), m = monthDate.getMonth();
+  const firstDay = new Date(y,m,1).getDay(); // 0=Minggu
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const today = fmtLocalDate(new Date());
+
+  let html = `<div class="cal-month-title">${monthNames[m]} ${y}</div><div class="cal-grid">`;
+  dow.forEach(d => html += `<div class="cal-dow">${d}</div>`);
+  for(let i=0;i<firstDay;i++) html += `<div class="cal-day disabled"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateObj = new Date(y,m,d);
+    const dateStr = fmtLocalDate(dateObj);
+    let cls = "cal-day";
+    if(dateStr === today) cls += " today-marker";
+    if(calSelecting.start && !calSelecting.end && fmtLocalDate(calSelecting.start) === dateStr) cls += " selected";
+    if(calSelecting.start && calSelecting.end){
+      const s = fmtLocalDate(calSelecting.start), e = fmtLocalDate(calSelecting.end);
+      if(dateStr === s || dateStr === e) cls += " selected";
+      else if(dateStr > s && dateStr < e) cls += " in-range";
+    }
+    html += `<div class="${cls}" onclick="pickCalDay('${dateStr}')">${d}</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function pickCalDay(dateStr){
+  const y = +dateStr.slice(0,4), mo = +dateStr.slice(4,6)-1, d = +dateStr.slice(6,8);
+  const picked = new Date(y,mo,d);
+
+  if(!calSelecting.start || (calSelecting.start && calSelecting.end)){
+    calSelecting = { start: picked, end: null };
+  } else {
+    if(fmtLocalDate(picked) < fmtLocalDate(calSelecting.start)){
+      calSelecting = { start: picked, end: null };
+    } else {
+      calSelecting.end = picked;
+      // terapkan custom range
+      iklanRangeFrom = fmtLocalDate(calSelecting.start);
+      iklanRangeTo = fmtLocalDate(calSelecting.end);
+      currentRangeIklan = "custom";
+      document.querySelectorAll(".preset-item").forEach(p=>p.classList.remove("active"));
+      const fLabel = `${String(calSelecting.start.getDate()).padStart(2,"0")}/${String(calSelecting.start.getMonth()+1).padStart(2,"0")}`;
+      const tLabel = `${String(calSelecting.end.getDate()).padStart(2,"0")}/${String(calSelecting.end.getMonth()+1).padStart(2,"0")}`;
+      document.getElementById("iklanRangeLabel").textContent = `${fLabel} - ${tLabel}`;
+      document.getElementById("iklanRangePanel").style.display = "none";
+      refreshIklanDashboard();
+    }
+  }
+  renderCalendars();
+}
+
 async function refreshIklanDashboard(){
-  const [from, to] = getRangeDatesFor(currentRangeIklan);
+  if(!iklanRangeFrom || !iklanRangeTo){
+    const [from, to] = getRangeDatesFor(currentRangeIklan);
+    iklanRangeFrom = from; iklanRangeTo = to;
+  }
+  const from = iklanRangeFrom, to = iklanRangeTo;
+
+  // Cek dulu: apakah ada laporan CUSTOM yang periodenya PERSIS sama
+  // dengan rentang yang dipilih di date-picker? Kalau ada, pakai itu
+  // langsung (datanya sudah pasti akurat, tidak perlu dijumlah dari harian).
+  const exactMatchId = `${from}_${to}`;
+  const exactDoc = await db.collection("iklan_reports").doc(exactMatchId).get();
+  if(exactDoc.exists){
+    const d = exactDoc.data();
+    document.getElementById("iklanEmptyState").style.display = "none";
+    document.getElementById("iklanContent").style.display = "block";
+    renderIklanKPI(d.summary);
+    renderIklanSeriesChart(d.summary.by_series);
+    renderIklanRoasChart(d.summary.by_series);
+    renderIklanAdsTable(d.ads.map(a=>({...a, ctr: a.dilihat?(a.klik/a.dilihat*100):0, acos: a.omzet?(a.biaya/a.omzet*100):0})));
+    return;
+  }
+
   const snap = await db.collection("iklan_daily")
     .where(firebase.firestore.FieldPath.documentId(), ">=", from)
     .where(firebase.firestore.FieldPath.documentId(), "<=", to)
@@ -911,6 +1115,11 @@ async function refreshIklanDashboard(){
   const totalOmzet = days.reduce((s,d)=>s+d.summary.total_omzet,0);
   const totalDilihat = days.reduce((s,d)=>s+d.summary.total_dilihat,0);
   const totalKlik = days.reduce((s,d)=>s+d.summary.total_klik,0);
+  const totalKonversi = days.reduce((s,d)=>s+(d.summary.total_konversi||0),0);
+  const totalTerjual = days.reduce((s,d)=>s+(d.summary.total_terjual||0),0);
+  const totalAddToCart = days.reduce((s,d)=>s+(d.summary.total_add_to_cart||0),0);
+  const totalVoucher = days.reduce((s,d)=>s+(d.summary.total_voucher||0),0);
+  const totalVoucheredSales = days.reduce((s,d)=>s+(d.summary.total_vouchered_sales||0),0);
 
   const bySeries = {};
   days.forEach(d=>{
@@ -928,8 +1137,11 @@ async function refreshIklanDashboard(){
     total_biaya: totalBiaya, total_omzet: totalOmzet,
     roas: totalBiaya ? (totalOmzet/totalBiaya) : 0,
     acos: totalOmzet ? (totalBiaya/totalOmzet*100) : 0,
-    total_klik: totalKlik,
+    total_klik: totalKlik, total_dilihat: totalDilihat,
+    total_konversi: totalKonversi, total_terjual: totalTerjual,
+    total_add_to_cart: totalAddToCart, total_voucher: totalVoucher, total_vouchered_sales: totalVoucheredSales,
     ctr_rata: totalDilihat ? (totalKlik/totalDilihat*100) : 0,
+    cart_rate: totalKlik ? (totalAddToCart/totalKlik*100) : 0,
     by_series: bySeries,
   };
 
@@ -960,18 +1172,24 @@ async function refreshIklanDashboard(){
 
 function renderIklanKPI(s){
   const cards = [
-    {label:"Total Biaya Iklan", value:`Rp ${s.total_biaya.toLocaleString("id-ID")}`, sub:""},
-    {label:"Omzet dari Iklan", value:`Rp ${s.total_omzet.toLocaleString("id-ID")}`, sub:""},
-    {label:"ROAS", value:`${s.roas.toFixed(2)}x`, sub:"omzet / biaya", warn: s.roas < 3},
-    {label:"ACOS", value:`${s.acos.toFixed(1)}%`, sub:"biaya / omzet", warn: s.acos > 20},
-    {label:"Total Klik", value:s.total_klik.toLocaleString("id-ID"), sub:`CTR ${s.ctr_rata.toFixed(2)}%`},
+    {label:"Iklan Dilihat", value:s.total_dilihat.toLocaleString("id-ID")},
+    {label:"Jumlah Klik", value:s.total_klik.toLocaleString("id-ID")},
+    {label:"Persentase Klik", value:`${s.ctr_rata.toFixed(2)}%`},
+    {label:"Pesanan", value:s.total_konversi.toLocaleString("id-ID")},
+    {label:"Produk Terjual", value:s.total_terjual.toLocaleString("id-ID")},
+    {label:"Penjualan dari Iklan", value:`Rp ${s.total_omzet.toLocaleString("id-ID")}`},
+    {label:"Biaya Iklan", value:`Rp ${s.total_biaya.toLocaleString("id-ID")}`},
+    {label:"ROAS", value:`${s.roas.toFixed(2)}x`, warn: s.roas < 3},
+    {label:"Jumlah Voucher", value:`Rp ${s.total_voucher.toLocaleString("id-ID")}`},
+    {label:"Penjualan dari Voucher", value:`Rp ${s.total_vouchered_sales.toLocaleString("id-ID")}`},
+    {label:"Tambah ke Keranjang", value:s.total_add_to_cart.toLocaleString("id-ID")},
+    {label:"Persentase Tambah ke Keranjang", value:`${s.cart_rate.toFixed(2)}%`},
   ];
   document.getElementById("iklanKpiGrid").innerHTML = cards.map(c=>`
     <div class="kpi-card cut-corner ${c.warn?'warn':''}">
       <div class="accent-cut"></div>
       <div class="kpi-label">${c.label}</div>
       <div class="kpi-value mono">${c.value}</div>
-      <div class="kpi-sub">${c.sub}</div>
     </div>`).join("");
 }
 
@@ -1045,7 +1263,6 @@ async function refreshCustomReportList(){
   if(snap.empty){
     rowEl.style.display = "none";
     emptyEl.style.display = "block";
-    document.getElementById("customReportContent").style.display = "none";
     return;
   }
   rowEl.style.display = "flex";
@@ -1058,29 +1275,18 @@ async function refreshCustomReportList(){
     opt.textContent = d.periode_label || doc.id;
     select.appendChild(opt);
   });
-  await loadCustomReport(snap.docs[0].id);
 }
 
 async function loadCustomReport(periodeId){
   if(!periodeId) return;
-  const doc = await db.collection("iklan_reports").doc(periodeId).get();
-  if(!doc.exists) return;
-  const d = doc.data();
-  document.getElementById("customReportContent").style.display = "block";
-  const s = d.summary;
-  const cards = [
-    {label:"Total Biaya", value:`Rp ${s.total_biaya.toLocaleString("id-ID")}`},
-    {label:"Total Omzet", value:`Rp ${s.total_omzet.toLocaleString("id-ID")}`},
-    {label:"ROAS", value:`${s.roas.toFixed(2)}x`},
-    {label:"ACOS", value:`${s.acos.toFixed(1)}%`},
-    {label:"Total Klik", value:s.total_klik.toLocaleString("id-ID")},
-  ];
-  document.getElementById("customKpiGrid").innerHTML = cards.map(c=>`
-    <div class="kpi-card cut-corner">
-      <div class="accent-cut"></div>
-      <div class="kpi-label">${c.label}</div>
-      <div class="kpi-value mono">${c.value}</div>
-    </div>`).join("");
+  const [start, end] = periodeId.split("_");
+  iklanRangeFrom = start; iklanRangeTo = end;
+  currentRangeIklan = "custom";
+  document.querySelectorAll(".preset-item").forEach(p=>p.classList.remove("active"));
+  const fmtLabel = (idStr) => idStr.length===8 ? `${idStr.slice(6,8)}/${idStr.slice(4,6)}` : idStr;
+  document.getElementById("iklanRangeLabel").textContent = `${fmtLabel(start)} - ${fmtLabel(end)}`;
+  await refreshIklanDashboard();
+  window.scrollTo({top:0, behavior:"smooth"});
 }
 
 async function initIklanPage(){
