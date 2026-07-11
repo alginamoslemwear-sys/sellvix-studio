@@ -7,7 +7,7 @@
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#07080B">
+<meta name="theme-color" content="#EEF4FC">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -27,26 +27,29 @@
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
   :root{
-    --bg:#07080B;
-    --surface:#101319;
-    --surface-2:#171B22;
-    --border:#232832;
-    --text:#F3F5F8;
-    --text-soft:#8D96A3;
+    --bg:#EEF4FC;
+    --bg-grad: linear-gradient(160deg, #EAF2FC 0%, #F6FAFE 55%, #EEF4FC 100%);
+    --surface:#FFFFFF;
+    --surface-2:#F3F7FD;
+    --border:#DCE7F7;
+    --navy:#0A1A3C;
+    --text:#0F1B33;
+    --text-soft:#5C6B85;
     --blue:#0050FE;
-    --blue-soft:#4A7EFF;
-    --blue-pale:rgba(0,80,254,0.14);
-    --danger:#FF5C72;
-    --danger-pale:rgba(255,92,114,0.12);
+    --blue-soft:#3D7BFF;
+    --blue-pale:rgba(0,80,254,0.08);
+    --danger:#E23B57;
+    --danger-pale:#FDEAEE;
     --radius:14px;
     --cut:16px;
-    --shadow: 0 10px 30px rgba(0,0,0,0.45);
+    --shadow: 0 8px 24px rgba(15,27,51,0.08);
   }
 
   *{box-sizing:border-box;}
   body{
     margin:0;
-    background:var(--bg);
+    background:var(--bg-grad);
+    background-attachment:fixed;
     color:var(--text);
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
@@ -68,23 +71,22 @@
 
   /* ── Topbar ── */
   header{
-    background:var(--surface);
-    border-bottom:1px solid var(--border);
-    color:var(--text);
+    background:var(--navy);
+    color:#fff;
     padding:22px 32px 20px;
   }
   .topbar{
     display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;
     max-width:1280px; margin:0 auto;
   }
-  .brand-row{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-  .brand-row img{ width:26px; height:26px; }
+  .brand-row{ margin-bottom:10px; }
+  .header-logo{ height:28px; width:auto; display:block; }
   .brand-eyebrow{
     font-family:'Space Grotesk',sans-serif;
-    font-size:15px; letter-spacing:.01em; font-weight:700; color:var(--text);
+    font-size:15px; letter-spacing:.01em; font-weight:700; color:#fff;
   }
-  header h1{ font-size:24px; font-weight:600; color:var(--text); }
-  header .sub{ font-size:13px; color:var(--text-soft); margin-top:4px; }
+  header h1{ font-size:24px; font-weight:600; color:#fff; }
+  header .sub{ font-size:13px; color:#B9C6E0; margin-top:4px; }
 
   .upload-zone{
     display:flex; align-items:center; gap:10px;
@@ -99,10 +101,10 @@
   .btn-primary{ background:var(--blue); color:#fff; }
   .btn-primary:hover{ background:var(--blue-soft); box-shadow:0 6px 18px rgba(0,80,254,.35); }
   .btn-ghost{
-    background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--border);
+    background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.25);
   }
   #fileInput{ display:none; }
-  .upload-status{ font-size:12px; color:var(--text-soft); margin-top:6px; min-height:16px; }
+  .upload-status{ font-size:12px; color:#B9C6E0; margin-top:6px; min-height:16px; }
 
   /* ── Layout ── */
   main{ max-width:1280px; margin:0 auto; padding:28px 32px 60px; }
@@ -122,20 +124,20 @@
   }
   .kpi-card{
     background:var(--surface); border:1px solid var(--border);
-    padding:18px 20px 16px; position:relative; overflow:hidden;
+    padding:18px 20px 16px; position:relative; overflow:hidden; box-shadow:var(--shadow);
   }
   .kpi-card .accent-cut{ position:absolute; top:0; left:0; }
   .kpi-label{ font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-soft); font-weight:600; margin-top:10px; }
-  .kpi-value{ font-size:24px; font-weight:600; margin-top:8px; color:var(--text); }
+  .kpi-value{ font-size:24px; font-weight:600; margin-top:8px; color:var(--navy); }
   .kpi-sub{ font-size:11.5px; color:var(--text-soft); margin-top:4px; }
   .kpi-card.warn .kpi-value{ color:var(--danger); }
 
   /* ── Panels ── */
   .grid-2{ display:grid; grid-template-columns:1.6fr 1fr; gap:18px; margin-bottom:18px; }
   .panel{
-    background:var(--surface); border:1px solid var(--border); padding:20px 22px;
+    background:var(--surface); border:1px solid var(--border); padding:20px 22px; box-shadow:var(--shadow);
   }
-  .panel h3{ font-size:16px; font-weight:600; color:var(--text); margin-bottom:14px; }
+  .panel h3{ font-size:16px; font-weight:600; color:var(--navy); margin-bottom:14px; }
   .panel .accent-cut{ margin-bottom:16px; }
 
   table{ width:100%; border-collapse:collapse; font-size:13px; }
@@ -150,15 +152,15 @@
 
   .log-panel{
     background:var(--danger-pale); border:1px solid var(--danger); border-radius:var(--radius);
-    padding:14px 18px; font-size:12.5px; color:#FFC2CB; margin-bottom:18px; display:none;
+    padding:14px 18px; font-size:12.5px; color:#8A1F35; margin-bottom:18px; display:none;
   }
   .log-panel.show{ display:block; }
-  .log-panel strong{ display:block; margin-bottom:6px; color:#fff; }
+  .log-panel strong{ display:block; margin-bottom:6px; color:#5C0F22; }
 
   .empty-state{
     text-align:center; padding:50px 20px; color:var(--text-soft);
   }
-  .empty-state h3{ color:var(--text); margin-bottom:8px; }
+  .empty-state h3{ color:var(--navy); margin-bottom:8px; }
 
   footer{ text-align:center; padding:22px; font-size:11.5px; color:var(--text-soft); }
 
@@ -169,7 +171,7 @@
 
   /* ── Login gate ── */
   #loginGate{
-    position:fixed; inset:0; background:var(--bg);
+    position:fixed; inset:0; background:var(--bg-grad);
     display:flex; align-items:center; justify-content:center; z-index:999;
   }
   .login-card{
@@ -177,10 +179,10 @@
     width:100%; max-width:340px; box-shadow:var(--shadow);
     text-align:center;
   }
-  .login-card img.login-logo{ width:40px; height:40px; margin-bottom:14px; }
+  .login-card img.login-logo{ width:100%; max-width:220px; height:auto; margin-bottom:18px; }
   .login-card .accent-cut{ margin:0 auto 20px; width:80px; }
-  .login-card .brand-eyebrow{ color:var(--text); justify-content:center; }
-  .login-card h1{ font-size:19px; color:var(--text); margin-bottom:4px; }
+  .login-card .brand-eyebrow{ color:var(--navy); justify-content:center; }
+  .login-card h1{ font-size:19px; color:var(--navy); margin-bottom:4px; }
   .login-card .sub{ color:var(--text-soft); font-size:13px; margin-bottom:22px; }
   #pwInput{
     width:100%; padding:13px 16px; border-radius:8px; border:1.5px solid var(--border);
@@ -197,16 +199,15 @@
     background:none; border:none; color:var(--text-soft); opacity:.85; font-size:12px;
     cursor:pointer; text-decoration:underline; font-family:'Inter',sans-serif; padding:0;
   }
-  .logout-link:hover{ opacity:1; color:var(--text); }
+  .logout-link:hover{ opacity:1; color:var(--navy); }
 </style>
 </head>
 <body>
 
 <div id="loginGate">
   <div class="login-card cut-corner">
-    <img class="login-logo" src="icon-192.png" alt="Sellvix AI">
+    <img class="login-logo" src="logo-wordmark.png" alt="Sellvix Studio">
     <div class="accent-cut"></div>
-    <div class="brand-eyebrow" style="display:flex;">Sellvix AI</div>
     <h1>Shopee Business Dashboard</h1>
     <div class="sub">Masukkan password untuk melanjutkan</div>
     <input type="password" id="pwInput" placeholder="Password" onkeydown="if(event.key==='Enter') checkPassword()">
@@ -221,8 +222,7 @@
   <div class="topbar">
     <div>
       <div class="brand-row">
-        <img src="icon-192.png" alt="Sellvix AI">
-        <div class="brand-eyebrow">Sellvix AI</div>
+        <img class="header-logo" src="logo-wordmark.png" alt="Sellvix Studio">
       </div>
       <h1>Shopee Business Dashboard</h1>
       <div class="sub" id="lastSync">Belum ada data — silakan upload file Excel pertama.</div>
@@ -367,7 +367,7 @@ const TITLE_OVERRIDES = [
 ];
 
 const SERIES_LABEL = { AULIA:"Aulia", SNTR:"Santorini", VOILE:"Voile", ARM:"Arami", "T-NDN":"Nadine", UNKNOWN:"Tidak dikenali" };
-const SERIES_COLOR = { AULIA:"#0050FE", SNTR:"#4A7EFF", VOILE:"#FFFFFF", ARM:"#7C93B8", "T-NDN":"#4C5D7A", UNKNOWN:"#5B6472" };
+const SERIES_COLOR = { AULIA:"#0050FE", SNTR:"#3D7BFF", VOILE:"#0A1A3C", ARM:"#7C93B8", "T-NDN":"#5C6B85", UNKNOWN:"#B0B8C4" };
 
 function detectSeries(namaProduk){
   if(!namaProduk) return "UNKNOWN";
@@ -700,15 +700,15 @@ function renderTrendChart(days){
         label:"GMV",
         data: days.map(d=>d.gmv),
         borderColor:"#0050FE",
-        backgroundColor:"rgba(0,80,254,0.14)",
-        fill:true, tension:.3, pointRadius:3, pointBackgroundColor:"#4A7EFF",
+        backgroundColor:"rgba(0,80,254,0.10)",
+        fill:true, tension:.3, pointRadius:3, pointBackgroundColor:"#0050FE",
       }]
     },
     options:{
       plugins:{legend:{display:false}},
       scales:{
-        y:{ ticks:{ color:"#8D96A3", callback:v=>"Rp "+v.toLocaleString("id-ID") }, grid:{ color:"#232832" } },
-        x:{ ticks:{ color:"#8D96A3" }, grid:{ color:"#232832" } }
+        y:{ ticks:{ color:"#5C6B85", callback:v=>"Rp "+v.toLocaleString("id-ID") }, grid:{ color:"#E3EAF6" } },
+        x:{ ticks:{ color:"#5C6B85" }, grid:{ color:"#E3EAF6" } }
       }
     }
   });
@@ -740,8 +740,8 @@ function renderSeriesChart(days){
       indexAxis:"y",
       plugins:{legend:{display:false}},
       scales:{
-        x:{ ticks:{ color:"#8D96A3" }, grid:{ color:"#232832" } },
-        y:{ ticks:{ color:"#F3F5F8" }, grid:{ display:false } }
+        x:{ ticks:{ color:"#5C6B85" }, grid:{ color:"#E3EAF6" } },
+        y:{ ticks:{ color:"#0F1B33" }, grid:{ display:false } }
       }
     }
   });
