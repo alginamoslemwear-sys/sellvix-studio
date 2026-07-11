@@ -329,13 +329,15 @@
 
   <div class="log-panel" id="unknownLog"></div>
 
-  <div class="filter-row">
-    <span style="font-size:13px; color:var(--ink-soft); font-weight:600; margin-right:4px;">Periode:</span>
-    <div class="chip active" data-range="today" onclick="setRange('today', this)">Hari Ini</div>
-    <div class="chip" data-range="7" onclick="setRange('7', this)">7 Hari</div>
-    <div class="chip" data-range="30" onclick="setRange('30', this)">30 Hari</div>
-    <div class="chip" data-range="month" onclick="setRange('month', this)">Bulan Ini</div>
-    <div class="chip" data-range="all" onclick="setRange('all', this)">Semua</div>
+  <div class="daterange-wrap" id="penjualanRangeWrap">
+    <button class="daterange-btn" onclick="togglePenjualanRangePicker()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <span id="penjualanRangeLabel">Pilih Periode</span>
+    </button>
+    <div class="daterange-panel" id="penjualanRangePanel" style="display:none;">
+      <div class="daterange-sidebar" id="penjualanRangeSidebar"></div>
+      <div class="daterange-content" id="penjualanRangeContent"></div>
+    </div>
   </div>
 
   <div class="kpi-grid" id="kpiGrid">
@@ -517,6 +519,7 @@
       <div class="coverage-note" id="keuanganCoverageNote" style="display:none;"></div>
 
       <div class="kpi-grid-4" id="keuanganKpiGrid"></div>
+      <p style="font-size:11.5px; color:var(--text-soft); margin:-14px 0 20px;">ℹ️ Komisi Affiliate, Admin Shopee, Voucher, dan Selisih Ongkir Kirim di atas cuma rincian transparansi — sudah otomatis termasuk di "Penghasilan Bersih", bukan potongan tambahan di luar itu. <strong>Dana Pending</strong> beda sendiri — itu order yang sudah dibuat tapi uangnya belum dirilis Shopee, jadi <strong>tidak</strong> ikut dihitung di Laba Bersih sekarang (nanti jadi omzet di laporan periode berikutnya begitu dirilis).</p>
 
       <div class="panel cut-corner">
         <h3>Laba per Series</h3>
@@ -525,7 +528,7 @@
           <thead><tr>
             <th>Series</th><th class="num">Qty Terjual</th><th class="num">Omzet</th>
             <th class="num">HPP/pcs</th><th class="num">Subtotal HPP</th>
-            <th class="num">Penghasilan Bersih</th><th class="num">Laba Bersih</th><th class="num">Margin</th>
+            <th class="num">Biaya Iklan</th><th class="num">Penghasilan Bersih</th><th class="num">Laba Bersih</th><th class="num">Margin</th>
           </tr></thead>
           <tbody id="keuanganSeriesBody"></tbody>
         </table>
@@ -1752,6 +1755,8 @@ function parseIncomeFile(arrayBuffer){
         col.layanan = row.indexOf("Biaya Layanan");
         col.prosesPesanan = row.indexOf("Biaya Proses Pesanan");
         col.penghasilan = row.indexOf("Total Penghasilan");
+        col.ongkirRetur = row.indexOf("Ongkos Kirim Pengembalian Barang");
+        col.voucherPenjual = row.indexOf("Voucher disponsor oleh Penjual");
         break;
       }
     }
@@ -1768,6 +1773,8 @@ function parseIncomeFile(arrayBuffer){
           biaya_administrasi: col.administrasi!==-1 ? num(row[col.administrasi]) : 0,
           biaya_layanan: col.layanan!==-1 ? num(row[col.layanan]) : 0,
           biaya_proses_pesanan: col.prosesPesanan!==-1 ? num(row[col.prosesPesanan]) : 0,
+          ongkir_retur: col.ongkirRetur!==-1 ? num(row[col.ongkirRetur]) : 0,
+          voucher_penjual: col.voucherPenjual!==-1 ? num(row[col.voucherPenjual]) : 0,
         });
       }
     }
@@ -1794,6 +1801,8 @@ function computeIncomeDailySummary(dayOrders){
     biaya_layanan: biayaLayanan,
     biaya_proses_pesanan: biayaProsesPesanan,
     total_biaya_admin_layanan: biayaKomisiAms + biayaAdministrasi + biayaLayanan + biayaProsesPesanan,
+    ongkir_retur: sum("ongkir_retur"),
+    voucher_penjual: sum("voucher_penjual"),
     total_dilepas: sum("total_penghasilan"),
   };
 }
@@ -1874,6 +1883,8 @@ function combineIncomeDocs(docs){
     biaya_layanan: sum("biaya_layanan"),
     biaya_proses_pesanan: sum("biaya_proses_pesanan"),
     total_biaya_admin_layanan: sum("total_biaya_admin_layanan"),
+    ongkir_retur: sum("ongkir_retur"),
+    voucher_penjual: sum("voucher_penjual"),
     total_dilepas: sum("total_dilepas"),
   };
 }
@@ -2088,6 +2099,73 @@ function renderCoverageNoteKeu(docs, from, to){
   }
 }
 
+// Ambil data Biaya Iklan (koleksi iklan_reports) untuk rentang [from,to] yang sama
+// dengan yang dipakai Laporan Keuangan — pakai logic yang sama persis kayak
+// Data Iklan (cari yang tercakup penuh + hindari dobel-hitung antar laporan).
+async function getAdsSpendForPeriod(from, to){
+  let adsDocs = [];
+  if(currentRangeKeuangan === "all"){
+    const snap = await db.collection("iklan_reports").get();
+    snap.forEach(doc => adsDocs.push(doc.data()));
+  } else {
+    const snap = await db.collection("iklan_reports")
+      .where("periode_start", ">=", from)
+      .where("periode_start", "<=", to)
+      .get();
+    snap.forEach(doc => {
+      const d = doc.data();
+      if(d.periode_end <= to) adsDocs.push(d);
+    });
+  }
+
+  if(adsDocs.length === 0){
+    return { bySeries: {}, totalBiaya: 0, hasData: false };
+  }
+
+  adsDocs = removeOverlappingSubsets(adsDocs);
+  const combined = combineIklanDocs(adsDocs);
+  return { bySeries: combined.summary.by_series, totalBiaya: combined.summary.total_biaya, hasData: true };
+}
+
+// Dana Pending: order Selesai yang dibuat (Data Penjualan) di periode ini,
+// tapi No. Pesanan-nya belum pernah ketemu di laporan Income manapun yang
+// sudah di-upload (semua periode, bukan cuma yang lagi dipilih) — artinya
+// dananya kemungkinan besar belum dirilis Shopee sampai sekarang.
+async function computeDanaPending(from, to){
+  let ordersSnap;
+  if(currentRangeKeuangan === "all"){
+    ordersSnap = await db.collection("orders").get();
+  } else {
+    const fromDate = ymdToDate(from);
+    const toDate = ymdToDate(to);
+    toDate.setHours(23,59,59,999);
+    const tsFrom = firebase.firestore.Timestamp.fromDate(fromDate);
+    const tsTo = firebase.firestore.Timestamp.fromDate(toDate);
+    ordersSnap = await db.collection("orders")
+      .where("waktu_pesanan_dibuat", ">=", tsFrom)
+      .where("waktu_pesanan_dibuat", "<=", tsTo)
+      .get();
+  }
+
+  const ordersInPeriod = [];
+  ordersSnap.forEach(doc => {
+    const d = doc.data();
+    if(d.status === "Selesai") ordersInPeriod.push(d);
+  });
+
+  // Kumpulkan SEMUA No. Pesanan yang pernah muncul di laporan Income manapun
+  const allIncomeSnap = await db.collection("income_reports").get();
+  const releasedSet = new Set();
+  allIncomeSnap.forEach(doc => {
+    (doc.data().orders_income||[]).forEach(o => releasedSet.add(o.no_pesanan));
+  });
+
+  const pendingOrders = ordersInPeriod.filter(o => !releasedSet.has(o.no_pesanan));
+  const total = pendingOrders.reduce((s,o)=>s+(o.total_pembayaran||0),0);
+
+  return { count: pendingOrders.length, total };
+}
+
 async function refreshKeuanganDashboard(){
   if(currentRangeKeuangan !== "all" && (!keuanganRangeFrom || !keuanganRangeTo)){
     const today = fmtLocalDate(new Date());
@@ -2129,8 +2207,18 @@ async function refreshKeuanganDashboard(){
 
   const profitResult = await computeSeriesProfitFromOrders(ordersIncomeList);
 
-  renderKeuanganKPI(incomeSummary, profitResult);
-  renderKeuanganSeriesTable(profitResult);
+  // Ambil Biaya Iklan (Data Iklan) untuk periode yang SAMA, supaya Laba Bersih
+  // benar-benar utuh (Penghasilan Bersih - HPP - Biaya Iklan), bukan cuma Income.
+  const adsBySeriesData = await getAdsSpendForPeriod(from, to);
+
+  // Dana Pending: order yang DIBUAT di periode ini (Data Penjualan), tapi
+  // dananya BELUM pernah muncul di laporan Income manapun yang sudah di-upload
+  // (kemungkinan besar karena belum dirilis Shopee). Ini bukan kerugian —
+  // nanti bakal jadi omzet/penghasilan begitu Shopee merilis dananya.
+  const danaPending = await computeDanaPending(from, to);
+
+  renderKeuanganKPI(incomeSummary, profitResult, adsBySeriesData, danaPending);
+  renderKeuanganSeriesTable(profitResult, adsBySeriesData);
 }
 
 /* ── Pencocokan presisi: tiap order di laporan penghasilan dicocokkan ke
@@ -2196,7 +2284,7 @@ async function computeSeriesProfitFromOrders(ordersIncomeList){
   };
 }
 
-function renderKeuanganKPI(incomeSummary, profitResult){
+function renderKeuanganKPI(incomeSummary, profitResult, adsData, danaPending){
   const { bySeries, matched, unmatched, unmatchedTotal, unmatchedOrders, excludedCount, excludedTotal, matchRate } = profitResult;
   const totalOmzetSeries = Object.values(bySeries).reduce((s,v)=>s+v.omzet,0);
   const totalPenghasilanBersih = Object.values(bySeries).reduce((s,v)=>s+v.penghasilan_bersih,0) + unmatchedTotal;
@@ -2204,16 +2292,23 @@ function renderKeuanganKPI(incomeSummary, profitResult){
   Object.entries(bySeries).forEach(([code,val])=>{
     totalHpp += (hppSettings[code]||0) * val.qty;
   });
-  const labaBersih = totalPenghasilanBersih - totalHpp;
+  const totalBiayaIklan = adsData.totalBiaya || 0;
+  const labaBersih = totalPenghasilanBersih - totalHpp - totalBiayaIklan;
   const margin = totalOmzetSeries ? (labaBersih/totalOmzetSeries*100) : 0;
 
   const cards = [
     {label:"Omzet Kotor (teridentifikasi)", value:`Rp ${totalOmzetSeries.toLocaleString("id-ID")}`},
     {label:"Penghasilan Bersih (dari Shopee)", value:`Rp ${Math.round(totalPenghasilanBersih).toLocaleString("id-ID")}`},
+    {label:"Komisi Affiliate (AMS)", value:`Rp ${Math.round(Math.abs(incomeSummary.biaya_komisi_ams||0)).toLocaleString("id-ID")}`},
+    {label:"Admin Shopee", value:`Rp ${Math.round(Math.abs((incomeSummary.biaya_administrasi||0)+(incomeSummary.biaya_layanan||0)+(incomeSummary.biaya_proses_pesanan||0))).toLocaleString("id-ID")}`},
+    {label:"Voucher Ditanggung Penjual", value:`Rp ${Math.round(Math.abs(incomeSummary.voucher_penjual||0)).toLocaleString("id-ID")}`},
+    {label:"Selisih Ongkos Kirim (Retur)", value:`Rp ${Math.round(Math.abs(incomeSummary.ongkir_retur||0)).toLocaleString("id-ID")}`, warn: Math.abs(incomeSummary.ongkir_retur||0) > 0},
     {label:"Total HPP", value:`Rp ${totalHpp.toLocaleString("id-ID")}`},
+    {label:"Biaya Iklan", value:`Rp ${Math.round(totalBiayaIklan).toLocaleString("id-ID")}`, warn: !adsData.hasData},
     {label:"Laba Bersih", value:`Rp ${Math.round(labaBersih).toLocaleString("id-ID")}`, warn: labaBersih<0},
     {label:"Margin", value:`${margin.toFixed(1)}%`, warn: margin<10},
     {label:"Order Tercocokkan", value:`${matchRate.toFixed(1)}%`, sub:`${matched}/${matched+unmatched} order`, warn: matchRate<70},
+    {label:"Dana Pending", value:`Rp ${Math.round(danaPending.total).toLocaleString("id-ID")}`, sub:`${danaPending.count} order, belum dirilis Shopee`},
   ];
   document.getElementById("keuanganKpiGrid").innerHTML = cards.map(c=>`
     <div class="kpi-card cut-corner ${c.warn?'warn':''}">
@@ -2224,6 +2319,9 @@ function renderKeuanganKPI(incomeSummary, profitResult){
     </div>`).join("");
 
   let logHtml = "";
+  if(!adsData.hasData){
+    logHtml += `<strong>⚠️ Belum ada data Data Iklan untuk periode ini</strong> — Biaya Iklan dianggap Rp 0, Laba Bersih di atas belum termasuk potongan biaya iklan. Upload laporan iklan untuk periode yang sama supaya Laba Bersih lebih akurat.<br><br>`;
+  }
   if(excludedCount > 0){
     logHtml += `<strong>🚫 ${excludedCount} pesanan (Rp ${Math.round(excludedTotal).toLocaleString("id-ID")}) dikecualikan dari perhitungan</strong> — terdeteksi sebagai FO (catatan penjual mengandung "TASIKMALAYA") atau ditandai manual.<br><br>`;
   }
@@ -2242,15 +2340,17 @@ function renderKeuanganKPI(incomeSummary, profitResult){
   }
 }
 
-function renderKeuanganSeriesTable(profitResult){
+function renderKeuanganSeriesTable(profitResult, adsData){
   const { bySeries, unmatched, unmatchedTotal } = profitResult;
+  const adsBySeries = adsData.bySeries || {};
 
   const rows = Object.entries(bySeries).map(([code,val])=>{
     const hppPcs = hppSettings[code] || 0;
     const subtotalHpp = hppPcs * val.qty;
-    const laba = val.penghasilan_bersih - subtotalHpp;
+    const biayaIklan = (adsBySeries[code] && adsBySeries[code].biaya) || 0;
+    const laba = val.penghasilan_bersih - subtotalHpp - biayaIklan;
     const margin = val.omzet ? (laba/val.omzet*100) : 0;
-    return { code, qty: val.qty, omzet: val.omzet, hppPcs, subtotalHpp, penghasilanBersih: val.penghasilan_bersih, laba, margin };
+    return { code, qty: val.qty, omzet: val.omzet, hppPcs, subtotalHpp, biayaIklan, penghasilanBersih: val.penghasilan_bersih, laba, margin };
   }).sort((a,b)=>b.omzet-a.omzet);
 
   let html = rows.map(r=>`
@@ -2260,6 +2360,7 @@ function renderKeuanganSeriesTable(profitResult){
       <td class="num mono">Rp ${r.omzet.toLocaleString("id-ID")}</td>
       <td class="num mono">Rp ${r.hppPcs.toLocaleString("id-ID")}</td>
       <td class="num mono">Rp ${r.subtotalHpp.toLocaleString("id-ID")}</td>
+      <td class="num mono">Rp ${Math.round(r.biayaIklan).toLocaleString("id-ID")}</td>
       <td class="num mono">Rp ${Math.round(r.penghasilanBersih).toLocaleString("id-ID")}</td>
       <td class="num mono" style="${r.laba<0?'color:var(--danger);':''}">Rp ${Math.round(r.laba).toLocaleString("id-ID")}</td>
       <td class="num mono">${r.margin.toFixed(1)}%</td>
@@ -2269,13 +2370,14 @@ function renderKeuanganSeriesTable(profitResult){
     html += `
     <tr style="opacity:.7;">
       <td colspan="5" style="font-style:italic; color:var(--text-soft);">Tidak Teridentifikasi (${unmatched} order)</td>
+      <td class="num mono">-</td>
       <td class="num mono">Rp ${Math.round(unmatchedTotal).toLocaleString("id-ID")}</td>
       <td class="num mono">Rp ${Math.round(unmatchedTotal).toLocaleString("id-ID")}</td>
       <td class="num">-</td>
     </tr>`;
   }
 
-  document.getElementById("keuanganSeriesBody").innerHTML = html || `<tr><td colspan="8" style="text-align:center; color:var(--text-soft);">Belum ada data</td></tr>`;
+  document.getElementById("keuanganSeriesBody").innerHTML = html || `<tr><td colspan="9" style="text-align:center; color:var(--text-soft);">Belum ada data</td></tr>`;
 }
 
 async function initKeuanganPage(){
@@ -2287,16 +2389,8 @@ async function initKeuanganPage(){
 
 
 
-let currentRange = "today";
 let trendChartInstance = null;
 let seriesChartInstance = null;
-
-function setRange(range, el){
-  currentRange = range;
-  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
-  el.classList.add("active");
-  refreshDashboard();
-}
 
 function fmtLocalDate(d){
   const y = d.getFullYear();
@@ -2305,23 +2399,178 @@ function fmtLocalDate(d){
   return `${y}${m}${day}`;
 }
 
+/* ── Date range picker Data Penjualan (duplikat pola Data Iklan/Keuangan) ── */
+let currentRangePenjualan = "today";
+let penjualanRangeFrom = null, penjualanRangeTo = null;
+let pickerCategoryPenj = null, pickerSelectedMonthPenj = null, pickerYearPenj = new Date().getFullYear();
+let todayHasDataPenj = false;
+
+async function togglePenjualanRangePicker(){
+  const panel = document.getElementById("penjualanRangePanel");
+  const willShow = panel.style.display === "none";
+  panel.style.display = willShow ? "flex" : "none";
+  if(willShow){
+    const todayId = fmtLocalDate(new Date());
+    try{
+      const doc = await db.collection("daily_summary").doc(todayId).get();
+      todayHasDataPenj = doc.exists;
+    }catch(e){ todayHasDataPenj = false; }
+    pickerCategoryPenj = null; pickerSelectedMonthPenj = null;
+    renderRangeSidebarPenj();
+    renderRangeContentPenj();
+  }
+}
+
+document.addEventListener("mousedown", (e) => {
+  const wrap = document.getElementById("penjualanRangeWrap");
+  if(wrap && !wrap.contains(e.target)){
+    const panel = document.getElementById("penjualanRangePanel");
+    if(panel) panel.style.display = "none";
+  }
+});
+
+function renderRangeSidebarPenj(){
+  const items = [
+    { key:"today", label:"Hari Ini", available: todayHasDataPenj, note: todayHasDataPenj?"":"Belum ada data hari ini" },
+    { key:"minggu", label:"Minggu", available:true },
+    { key:"bulan", label:"Bulan", available:true },
+    { key:"kuartal", label:"Kuartal", available:true },
+    { key:"all", label:"Semua Data", available:true },
+  ];
+  document.getElementById("penjualanRangeSidebar").innerHTML = items.map(it=>{
+    const activeCls = (pickerCategoryPenj===it.key)?"active":"";
+    const disabledCls = it.available?"":"disabled";
+    const clickAttr = it.available? `onclick="selectRangeCategoryPenj('${it.key}')"` : "";
+    const chev = ["minggu","bulan","kuartal"].includes(it.key) ? '<span class="chev">›</span>' : "";
+    return `<div class="range-cat ${activeCls} ${disabledCls}" ${clickAttr}><span>${it.label}${it.note?`<span class="range-cat-note">${it.note}</span>`:""}</span>${chev}</div>`;
+  }).join("");
+}
+
+function selectRangeCategoryPenj(cat){
+  pickerCategoryPenj = cat;
+  pickerSelectedMonthPenj = null;
+
+  if(cat === "today"){
+    const today = fmtLocalDate(new Date());
+    applyExplicitRangePenj(today, today, "Hari Ini");
+    return;
+  }
+  if(cat === "all"){
+    currentRangePenjualan = "all";
+    penjualanRangeFrom = null; penjualanRangeTo = null;
+    document.getElementById("penjualanRangeLabel").textContent = "Semua Data";
+    document.getElementById("penjualanRangePanel").style.display = "none";
+    refreshDashboard();
+    return;
+  }
+  renderRangeSidebarPenj();
+  renderRangeContentPenj();
+}
+
+async function applyExplicitRangePenj(from, to, label){
+  currentRangePenjualan = "custom";
+  penjualanRangeFrom = from; penjualanRangeTo = to;
+  document.getElementById("penjualanRangeLabel").textContent = label;
+  document.getElementById("penjualanRangePanel").style.display = "none";
+  await refreshDashboard();
+}
+
+function renderRangeContentPenj(){
+  const el = document.getElementById("penjualanRangeContent");
+  if(pickerCategoryPenj === "minggu") return renderMonthGridForFlowPenj(el, "minggu");
+  if(pickerCategoryPenj === "bulan") return renderMonthGridForFlowPenj(el, "bulan");
+  if(pickerCategoryPenj === "kuartal") return renderQuarterGridPenj(el);
+  el.innerHTML = `<div style="color:var(--text-soft); font-size:13px; text-align:center; padding:30px 10px;">Pilih kategori di sebelah kiri</div>`;
+}
+
+function renderMonthGridForFlowPenj(el, flow){
+  if(flow === "minggu" && pickerSelectedMonthPenj !== null){
+    return renderWeekListPenj(el);
+  }
+  let html = `<div class="year-nav">
+    <span class="cal-arrow" onclick="shiftPickerYearPenj(-1)">‹</span>
+    <div class="content-title" style="margin:0;">${pickerYearPenj}</div>
+    <span class="cal-arrow" onclick="shiftPickerYearPenj(1)">›</span>
+  </div>`;
+  html += `<div class="month-grid">`;
+  for(let m=0;m<12;m++){
+    html += `<div class="month-cell" onclick="pickMonthPenj(${m}, '${flow}')">${MONTH_SHORT[m]}</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function shiftPickerYearPenj(dir){
+  pickerYearPenj += dir;
+  renderRangeContentPenj();
+}
+
+function pickMonthPenj(monthIdx, flow){
+  if(flow === "bulan"){
+    const from = `${pickerYearPenj}${String(monthIdx+1).padStart(2,"0")}01`;
+    const daysInMonth = new Date(pickerYearPenj, monthIdx+1, 0).getDate();
+    const to = `${pickerYearPenj}${String(monthIdx+1).padStart(2,"0")}${String(daysInMonth).padStart(2,"0")}`;
+    applyExplicitRangePenj(from, to, `${MONTH_NAMES[monthIdx]} ${pickerYearPenj}`);
+    return;
+  }
+  pickerSelectedMonthPenj = monthIdx;
+  renderRangeContentPenj();
+}
+
+function renderWeekListPenj(el){
+  const monthIdx = pickerSelectedMonthPenj;
+  const daysInMonth = new Date(pickerYearPenj, monthIdx+1, 0).getDate();
+  const weekBounds = [[1,7],[8,14],[15,21],[22,28]];
+  if(daysInMonth >= 29) weekBounds.push([29, daysInMonth]);
+
+  let html = `<span class="content-back" onclick="pickerSelectedMonthPenj=null; renderRangeContentPenj();">‹ ${MONTH_NAMES[monthIdx]} ${pickerYearPenj}</span>`;
+  html += `<div class="content-title">Pilih Minggu</div>`;
+  html += `<div class="week-list">`;
+  weekBounds.forEach(([startD,endD],idx) => {
+    const from = `${pickerYearPenj}${String(monthIdx+1).padStart(2,"0")}${String(startD).padStart(2,"0")}`;
+    const to = `${pickerYearPenj}${String(monthIdx+1).padStart(2,"0")}${String(endD).padStart(2,"0")}`;
+    html += `<div class="week-item" onclick="applyExplicitRangePenj('${from}','${to}','Minggu ${idx+1} - ${MONTH_SHORT[monthIdx]} ${pickerYearPenj}')">
+      <span>Minggu ${idx+1}</span>
+      <span class="range-sub">${String(startD).padStart(2,"0")} - ${String(endD).padStart(2,"0")} ${MONTH_SHORT[monthIdx]}</span>
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function renderQuarterGridPenj(el){
+  const quarters = [
+    { label:"Kuartal 1", sub:"Jan - Mar", startM:0, endM:2 },
+    { label:"Kuartal 2", sub:"Apr - Jun", startM:3, endM:5 },
+    { label:"Kuartal 3", sub:"Jul - Sep", startM:6, endM:8 },
+    { label:"Kuartal 4", sub:"Okt - Des", startM:9, endM:11 },
+  ];
+  let html = `<div class="year-nav">
+    <span class="cal-arrow" onclick="shiftPickerYearPenj(-1)">‹</span>
+    <div class="content-title" style="margin:0;">${pickerYearPenj}</div>
+    <span class="cal-arrow" onclick="shiftPickerYearPenj(1)">›</span>
+  </div>`;
+  html += `<div class="quarter-grid">`;
+  quarters.forEach(q => {
+    const daysInEndMonth = new Date(pickerYearPenj, q.endM+1, 0).getDate();
+    const from = `${pickerYearPenj}${String(q.startM+1).padStart(2,"0")}01`;
+    const to = `${pickerYearPenj}${String(q.endM+1).padStart(2,"0")}${String(daysInEndMonth).padStart(2,"0")}`;
+    html += `<div class="quarter-cell" onclick="applyExplicitRangePenj('${from}','${to}','${q.label} ${pickerYearPenj}')">
+      <div class="q-title">${q.label}</div>
+      <div class="q-sub">${q.sub} ${pickerYearPenj}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
 function getRangeDates(){
-  const today = new Date();
-  const fmt = fmtLocalDate;
-  if(currentRange === "today") return [fmt(today), fmt(today)];
-  if(currentRange === "7"){
-    const from = new Date(today); from.setDate(from.getDate()-6);
-    return [fmt(from), fmt(today)];
+  if(currentRangePenjualan === "all") return ["00000000","99999999"];
+  if(!penjualanRangeFrom || !penjualanRangeTo){
+    const today = fmtLocalDate(new Date());
+    return [today, today];
   }
-  if(currentRange === "30"){
-    const from = new Date(today); from.setDate(from.getDate()-29);
-    return [fmt(from), fmt(today)];
-  }
-  if(currentRange === "month"){
-    const from = new Date(today.getFullYear(), today.getMonth(), 1);
-    return [fmt(from), fmt(today)];
-  }
-  return ["00000000","99999999"]; // all
+  return [penjualanRangeFrom, penjualanRangeTo];
 }
 
 async function refreshDashboard(){
