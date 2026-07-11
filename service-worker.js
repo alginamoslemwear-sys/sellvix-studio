@@ -5,7 +5,7 @@
 // dan sync tetap butuh koneksi internet (Firestore). Ini cuma mem-percepat
 // loading file HTML/CSS/JS statisnya sendiri.
 
-const CACHE_NAME = "mmh-dashboard-shell-v1";
+const CACHE_NAME = "mmh-dashboard-shell-v2";
 const APP_SHELL = [
   "./index.html",
   "./manifest.json",
@@ -38,18 +38,19 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // NETWORK-FIRST: selalu coba ambil versi terbaru dari internet dulu.
+  // Cache cuma dipakai sebagai fallback kalau internet mati (offline).
+  // Ini penting supaya update file (index.html dll) selalu langsung
+  // kepakai begitu di-deploy, tidak nyangkut di versi lama.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
