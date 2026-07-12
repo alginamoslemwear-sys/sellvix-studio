@@ -22,6 +22,7 @@
 <!-- Firebase (compat build) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -113,7 +114,7 @@
   .btn-ghost{
     background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.25);
   }
-  #fileInput, #iklanFileInput, #keuanganFileInput{ display:none; }
+  #fileInput, #iklanFileInput, #keuanganFileInput, #saldoFileInput{ display:none; }
   .upload-status{ font-size:12px; color:#B9C6E0; margin-top:6px; min-height:16px; }
 
   /* ── Layout ── */
@@ -212,6 +213,43 @@
   .panel h3{ font-size:16px; font-weight:600; color:var(--navy); margin-bottom:14px; }
   .panel .accent-cut{ margin-bottom:16px; }
 
+  .faq-item{
+    border-bottom:1px solid var(--border); padding:14px 0;
+  }
+  .faq-item:last-of-type{ border-bottom:none; }
+  .faq-item summary{
+    cursor:pointer; font-weight:600; font-size:14px; color:var(--navy);
+    list-style:none; display:flex; align-items:center; justify-content:space-between;
+  }
+  .faq-item summary::-webkit-details-marker{ display:none; }
+  .faq-item summary::after{
+    content:"›"; font-size:20px; color:var(--blue); transform:rotate(90deg); transition:transform .2s;
+  }
+  .faq-item[open] summary::after{ transform:rotate(270deg); }
+  .faq-item ol, .faq-item p{ margin-top:10px; padding-left:20px; font-size:13.5px; color:var(--text-soft); line-height:1.7; }
+  .faq-item p{ padding-left:0; }
+  .faq-item li{ margin-bottom:4px; }
+  .faq-note{
+    margin-top:8px; font-size:12px !important; color:var(--text-soft) !important;
+    background:var(--bg); padding:10px 12px; border-radius:6px;
+  }
+
+  .print-header{ margin-bottom:20px; }
+  .print-header-logo{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px; color:var(--blue); }
+  .print-header-title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:18px; color:var(--navy); margin-top:2px; }
+  .print-header-periode{ font-size:13px; color:var(--text-soft); margin-top:4px; }
+  .print-header-date{ font-size:11px; color:var(--text-soft); margin-top:2px; }
+
+  @media print{
+    body{ background:#fff !important; }
+    header, .no-print, .daterange-wrap, .upload-row, .upload-row + p,
+    #hppSettingsPanel, #excludedOrdersPanel, #keuanganLog{ display:none !important; }
+    .print-header{ display:block !important; }
+    main{ max-width:100%; padding:0; }
+    .kpi-card, .panel{ box-shadow:none !important; border:1px solid #ccc !important; break-inside:avoid; }
+    .kpi-grid-4{ grid-template-columns:repeat(3,1fr) !important; }
+  }
+
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   th{
     text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.06em;
@@ -263,14 +301,14 @@
   .login-card .brand-eyebrow{ color:#fff; justify-content:center; }
   .login-card h1{ font-size:19px; color:#fff; margin-bottom:4px; }
   .login-card .sub{ color:#B9C6E0; font-size:13px; margin-bottom:22px; }
-  #pwInput{
+  .login-card input{
     width:100%; padding:13px 16px; border-radius:8px; border:1.5px solid rgba(255,255,255,.18);
-    font-family:'Inter',sans-serif; font-size:15px; text-align:center; letter-spacing:.05em;
-    margin-bottom:12px; background:rgba(255,255,255,.08); color:#fff;
+    font-family:'Inter',sans-serif; font-size:15px; text-align:center; letter-spacing:.02em;
+    margin-bottom:12px; background:rgba(255,255,255,.08); color:#fff; box-sizing:border-box;
   }
-  #pwInput::placeholder{ color:#8493B0; }
-  #pwInput:focus{ outline:none; border-color:var(--blue-soft); }
-  #pwInput.error{ border-color:var(--danger); animation:shake .3s; }
+  .login-card input::placeholder{ color:#8493B0; }
+  .login-card input:focus{ outline:none; border-color:var(--blue-soft); }
+  .login-card input.error{ border-color:var(--danger); animation:shake .3s; }
   @keyframes shake{ 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
   #pwError{ color:#FF8B9E; font-size:12px; min-height:16px; margin-bottom:10px; }
   .login-card .btn-primary{ width:100%; padding:13px; }
@@ -280,6 +318,70 @@
     cursor:pointer; text-decoration:underline; font-family:'Inter',sans-serif; padding:0;
   }
   .logout-link:hover{ opacity:1; color:var(--navy); }
+  /* ═══ Chatbot Bantuan ═══ */
+  .chatbot-fab{
+    position:fixed; bottom:22px; right:22px; width:56px; height:56px; border-radius:50%;
+    background:var(--blue); color:#fff; border:none; font-size:24px; cursor:pointer;
+    box-shadow:0 6px 20px rgba(0,80,254,0.35); z-index:999; transition:transform .15s;
+  }
+  .chatbot-fab:hover{ transform:scale(1.06); }
+  .chatbot-panel{
+    position:fixed; bottom:88px; right:22px; width:340px; max-width:calc(100vw - 32px);
+    height:480px; max-height:calc(100vh - 120px); background:var(--surface); border-radius:16px;
+    box-shadow:0 12px 40px rgba(15,27,51,0.22); z-index:999; display:flex; flex-direction:column;
+    overflow:hidden; border:1px solid var(--border);
+  }
+  .chatbot-header{
+    background:var(--navy); color:#fff; padding:16px 18px; display:flex;
+    align-items:center; justify-content:space-between; flex-shrink:0;
+  }
+  .chatbot-header-title{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; }
+  .chatbot-header-sub{ font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px; }
+  .chatbot-close{ cursor:pointer; font-size:16px; opacity:.7; }
+  .chatbot-close:hover{ opacity:1; }
+  .chatbot-body{
+    flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px;
+    background:var(--bg);
+  }
+  .chatbot-bubble{
+    max-width:85%; padding:10px 13px; border-radius:12px; font-size:13px; line-height:1.5;
+  }
+  .chatbot-bubble.bot{
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    align-self:flex-start; border-bottom-left-radius:2px;
+  }
+  .chatbot-bubble.user{
+    background:var(--blue); color:#fff; align-self:flex-end; border-bottom-right-radius:2px;
+  }
+  .chatbot-question-btn{
+    display:block; width:100%; text-align:left; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:9px 12px; font-size:12.5px; color:var(--blue); cursor:pointer;
+    margin-bottom:6px; transition:background .15s;
+  }
+  .chatbot-question-btn:hover{ background:var(--blue-pale); }
+  .chatbot-back-btn{
+    font-size:12px; color:var(--text-soft); cursor:pointer; margin-top:4px; align-self:flex-start;
+  }
+  .chatbot-footer{ padding:12px 16px; border-top:1px solid var(--border); flex-shrink:0; }
+  .chatbot-admin-btn{
+    width:100%; background:#25D366; color:#fff; border:none; border-radius:8px;
+    padding:10px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .chatbot-admin-btn:hover{ opacity:.9; }
+
+  .upload-zone{
+    border:2px dashed var(--border); border-radius:14px; padding:48px 20px; text-align:center;
+    cursor:pointer; transition:all .15s; background:var(--surface);
+  }
+  .upload-zone:hover, .upload-zone.dragover{ border-color:var(--blue); background:var(--blue-pale); }
+  .upload-zone-icon{ font-size:40px; margin-bottom:10px; }
+  .upload-zone-text{ font-size:15px; font-weight:600; color:var(--navy); margin-bottom:4px; }
+  .upload-zone-sub{ font-size:12px; color:var(--text-soft); }
+  #uploadZoneInput{ display:none; }
+  .upload-progress-item{
+    display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; margin-top:10px; font-size:13px;
+  }
 </style>
 </head>
 <body>
@@ -288,11 +390,21 @@
   <div class="login-card cut-corner">
     <img class="login-logo" src="logo-wordmark.png" alt="Sellvix Studio">
     <div class="accent-cut"></div>
-    <h1>Shopee Business Dashboard</h1>
-    <div class="sub">Masukkan password untuk melanjutkan</div>
-    <input type="password" id="pwInput" placeholder="Password" onkeydown="if(event.key==='Enter') checkPassword()">
-    <div id="pwError"></div>
-    <button class="btn btn-primary" onclick="checkPassword()">Masuk</button>
+    <h1>Sellvix AI</h1>
+    <div class="sub" id="authModeSub">Masuk ke akun toko kamu</div>
+
+    <div id="authError" style="color:#ff8080; font-size:12.5px; margin:8px 0; display:none;"></div>
+
+    <input type="text" id="signupNamaToko" placeholder="Nama Toko" style="display:none;">
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitAuthForm()">
+
+    <button class="btn btn-primary" id="authSubmitBtn" onclick="submitAuthForm()">Masuk</button>
+
+    <div style="margin-top:16px; font-size:13px; text-align:center; color:rgba(255,255,255,0.7);">
+      <span id="authToggleText">Belum punya akun?</span>
+      <a href="#" onclick="toggleAuthMode(); return false;" id="authToggleLink" style="color:#fff; font-weight:600;">Daftar di sini</a>
+    </div>
   </div>
 </div>
 
@@ -310,24 +422,49 @@
   </div>
   <div class="topbar" style="margin-top:14px;">
     <nav class="main-nav">
-      <div class="nav-item active" data-page="penjualan" onclick="switchPage('penjualan', this)">Data Penjualan</div>
+      <div class="nav-item active" data-page="upload" onclick="switchPage('upload', this)">Upload Pusat</div>
+      <div class="nav-item" data-page="penjualan" onclick="switchPage('penjualan', this)">Data Penjualan</div>
       <div class="nav-item" data-page="iklan" onclick="switchPage('iklan', this)">Data Iklan</div>
       <div class="nav-item" data-page="keuangan" onclick="switchPage('keuangan', this)">Laporan Keuangan</div>
+      <div class="nav-item" data-page="faq" onclick="switchPage('faq', this)">Panduan</div>
     </nav>
   </div>
 </header>
 
 <main>
 
-  <div id="page-penjualan">
+  <div id="page-upload">
 
-  <div class="upload-row">
-    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">↑ Upload Excel Harian</button>
-    <div class="upload-status" id="uploadStatus"></div>
-    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
-  </div>
+    <h2 style="font-family:'Space Grotesk',sans-serif; font-size:20px; margin-bottom:4px;">Upload Pusat</h2>
+    <p style="font-size:13px; color:var(--text-soft); margin-bottom:20px;">Taruh semua file laporan Shopee di sini sekaligus — Order All, Laporan Iklan, Laporan Penghasilan, dan Laporan Saldo. Sistem otomatis mendeteksi jenis tiap file dari isi datanya.</p>
 
-  <div class="log-panel" id="unknownLog"></div>
+    <div class="upload-zone" id="uploadZone"
+         ondrop="handleUploadZoneDrop(event)"
+         ondragover="event.preventDefault(); document.getElementById('uploadZone').classList.add('dragover');"
+         ondragleave="document.getElementById('uploadZone').classList.remove('dragover');"
+         onclick="document.getElementById('uploadZoneInput').click()">
+      <div class="upload-zone-icon">📂</div>
+      <div class="upload-zone-text">Klik untuk pilih file, atau seret &amp; lepas di sini</div>
+      <div class="upload-zone-sub">Bisa banyak file sekaligus — Excel (.xlsx) atau CSV</div>
+      <input type="file" id="uploadZoneInput" multiple accept=".xlsx,.xls,.csv" onchange="handleUploadZoneSelect(event)">
+    </div>
+
+    <div id="uploadZoneProgress"></div>
+
+    <div class="panel cut-corner" style="margin-top:24px;">
+      <h3>Riwayat Upload</h3>
+      <div class="accent-cut"></div>
+      <table>
+        <thead><tr>
+          <th>Waktu</th><th>Nama File</th><th>Jenis Terdeteksi</th><th>Keterangan</th><th>Status</th>
+        </tr></thead>
+        <tbody id="uploadHistoryBody"><tr><td colspan="5" style="text-align:center; color:var(--text-soft);">Memuat riwayat...</td></tr></tbody>
+      </table>
+    </div>
+
+  </div><!-- /#page-upload -->
+
+  <div id="page-penjualan" style="display:none;">
 
   <div class="daterange-wrap" id="penjualanRangeWrap">
     <button class="daterange-btn" onclick="togglePenjualanRangePicker()">
@@ -379,13 +516,8 @@
 
   <div id="page-iklan" style="display:none;">
 
-    <div class="upload-row">
-      <button class="btn btn-primary" onclick="document.getElementById('iklanFileInput').click()">↑ Upload Laporan Iklan</button>
-      <div class="upload-status" id="iklanUploadStatus"></div>
-      <input type="file" id="iklanFileInput" accept=".csv,.xlsx,.xls" onchange="handleIklanFileSelect(event)">
-    </div>
-    <p style="font-size:12px; color:var(--text-soft); margin:-10px 0 20px;">
-      Upload periode berapa pun (harian, mingguan, bulanan) — bebas, sesuai kenyamanan kamu. Saat kamu pilih filter di bawah, sistem menampilkan gabungan laporan yang tercakup penuh di rentang itu, lengkap dengan keterangan periode mana saja yang datanya tersedia.
+    <p style="font-size:12px; color:var(--text-soft); margin:0 0 20px;">
+      Upload file laporan iklan lewat menu <strong>Upload Pusat</strong>. Periode berapa pun (harian, mingguan, bulanan) bebas — sistem menampilkan gabungan laporan yang tercakup penuh di rentang yang kamu pilih di bawah, lengkap dengan keterangan periode mana saja yang datanya tersedia.
     </p>
 
     <div class="log-panel" id="iklanLog"></div>
@@ -465,14 +597,11 @@
   <div id="page-keuangan" style="display:none;">
 
     <div class="upload-row">
-      <button class="btn btn-primary" onclick="document.getElementById('keuanganFileInput').click()">↑ Upload Laporan Penghasilan</button>
-      <div class="upload-status" id="keuanganUploadStatus"></div>
-      <input type="file" id="keuanganFileInput" accept=".xlsx,.xls" onchange="handleKeuanganFileSelect(event)">
-      <button class="btn btn-ghost" style="margin-left:auto; color:var(--navy); border-color:var(--border);" onclick="toggleHppSettings()">⚙️ Setting HPP per Series</button>
+      <button class="btn btn-ghost" style="color:var(--navy); border-color:var(--border);" onclick="toggleHppSettings()">⚙️ Setting HPP per Series</button>
       <button class="btn btn-ghost" style="color:var(--navy); border-color:var(--border);" onclick="toggleExcludedOrders()">🚫 Kelola Pesanan Dikecualikan</button>
     </div>
     <p style="font-size:12px; color:var(--text-soft); margin:-10px 0 20px;">
-      Upload file "Laporan Penghasilan" (Income) dari Shopee — periode berapa pun bebas, sama seperti Data Iklan. Laba per series dihitung otomatis pakai qty penjualan dari Data Penjualan + HPP yang kamu set.
+      Upload file "Laporan Penghasilan" dan "Laporan Saldo" lewat menu <strong>Upload Pusat</strong>. Laba per series dihitung otomatis pakai qty penjualan dari Data Penjualan + HPP yang kamu set.
     </p>
 
     <div class="panel cut-corner" id="hppSettingsPanel" style="display:none; margin-bottom:20px;">
@@ -487,12 +616,19 @@
     <div class="panel cut-corner" id="excludedOrdersPanel" style="display:none; margin-bottom:20px;">
       <h3>Pesanan Dikecualikan dari Laporan Keuangan</h3>
       <div class="accent-cut"></div>
-      <p style="font-size:12px; color:var(--text-soft); margin-bottom:14px;">
-        <strong>Otomatis:</strong> order dengan kata sandi <strong>"TASIKMALAYA"</strong> di Catatan Penjual (kolom "Catatan" di Data Penjualan) otomatis terdeteksi sebagai FO dan dikecualikan — tidak perlu diketik di sini.<br><br>
-        <strong>Manual (opsional):</strong> tempel No. Pesanan tambahan yang mau dikecualikan tapi belum ditandai TASIKMALAYA. Satu nomor per baris. Order ini hanya dikecualikan di sini (Laporan Keuangan), <strong>tidak</strong> mengubah data di Data Penjualan.
+
+      <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Kata Sandi FO (Fake Order)</label>
+      <p style="font-size:12px; color:var(--text-soft); margin-bottom:10px;">
+        Order dengan kata ini di kolom <strong>Catatan</strong> (Catatan Penjual, dari Data Penjualan) otomatis terdeteksi sebagai FO dan dikecualikan dari GMV & Laporan Keuangan. Atur sesuai kata sandi yang kamu pakai sendiri — kosongkan kalau nggak mau pakai deteksi otomatis.
+      </p>
+      <input type="text" id="foKeywordInput" placeholder="misal: TASIKMALAYA" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-family:'IBM Plex Mono',monospace; font-size:13px; margin-bottom:18px;">
+
+      <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Pengecualian Manual (opsional)</label>
+      <p style="font-size:12px; color:var(--text-soft); margin-bottom:10px;">
+        Tempel No. Pesanan tambahan yang mau dikecualikan tapi belum ketandai kata sandi di atas. Satu nomor per baris. Order ini hanya dikecualikan di sini (Laporan Keuangan), <strong>tidak</strong> mengubah data di Data Penjualan.
       </p>
       <textarea id="excludedOrdersInput" rows="6" placeholder="260601ABCDEF&#10;260602GHIJKL" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); font-family:'IBM Plex Mono',monospace; font-size:12.5px; margin-bottom:12px;"></textarea>
-      <button class="btn btn-primary" onclick="saveExcludedOrders()">Simpan Daftar</button>
+      <button class="btn btn-primary" onclick="saveExcludedOrders()">Simpan</button>
       <span id="excludedSaveStatus" style="font-size:12px; color:var(--text-soft); margin-left:10px;"></span>
     </div>
 
@@ -505,6 +641,14 @@
         <div class="daterange-sidebar" id="keuanganRangeSidebar"></div>
         <div class="daterange-content" id="keuanganRangeContent"></div>
       </div>
+    </div>
+    <button class="btn btn-ghost no-print" style="margin:0 0 20px; color:var(--navy); border-color:var(--border);" onclick="downloadKeuanganPDF()">📄 Download PDF</button>
+
+    <div class="print-header" id="printHeader" style="display:none;">
+      <div class="print-header-logo">Sellvix AI</div>
+      <div class="print-header-title">Laporan Keuangan</div>
+      <div class="print-header-periode" id="printHeaderPeriode"></div>
+      <div class="print-header-date" id="printHeaderDate"></div>
     </div>
 
     <div class="log-panel" id="keuanganLog"></div>
@@ -538,10 +682,118 @@
 
   </div><!-- /#page-keuangan -->
 
+  <div id="page-faq" style="display:none;">
+
+    <h2 style="font-family:'Space Grotesk',sans-serif; font-size:20px; margin-bottom:4px;">Panduan Pemakaian</h2>
+    <p style="font-size:13px; color:var(--text-soft); margin-bottom:24px;">Kumpulan panduan langkah-demi-langkah buat pakai Sellvix AI, dari download data di Shopee sampai upload ke aplikasi ini.</p>
+
+    <div class="panel cut-corner" style="margin-bottom:20px;">
+      <h3>1. Cara Download Laporan dari Shopee</h3>
+      <div class="accent-cut"></div>
+
+      <details class="faq-item">
+        <summary>📦 Data Penjualan (Order All)</summary>
+        <ol>
+          <li>Login ke <strong>seller.shopee.co.id</strong></li>
+          <li>Menu <strong>Pesanan</strong> → <strong>Pesanan Saya</strong></li>
+          <li>Klik tab <strong>"Semua"</strong></li>
+          <li>Atur filter tanggal berdasarkan <strong>"Waktu Pesanan Dibuat"</strong> sesuai periode yang mau diambil</li>
+          <li>Klik tombol <strong>"Export"</strong> (biasanya di kanan atas)</li>
+          <li>Klik <strong>Export</strong> lagi di jendela konfirmasi, tunggu diproses</li>
+          <li>Buka <strong>Riwayat Download</strong>, klik <strong>Download</strong> buat ambil file Excel-nya</li>
+        </ol>
+      </details>
+
+      <details class="faq-item">
+        <summary>📢 Data Iklan (Laporan CPC)</summary>
+        <ol>
+          <li>Dari Seller Center, klik menu <strong>Iklan Shopee</strong> (atau ke <strong>iklan.shopee.co.id</strong> langsung)</li>
+          <li>Masuk ke <strong>"Semua Statistik Iklan"</strong> / tab Laporan</li>
+          <li>Atur periode tanggal (maksimal 90 hari terakhir)</li>
+          <li>Klik tombol <strong>"Unduh Laporan"</strong></li>
+          <li>Pilih <strong>"Semua Laporan Iklan CPC"</strong>, download sebagai CSV/Excel</li>
+        </ol>
+      </details>
+
+      <details class="faq-item">
+        <summary>💰 Laporan Penghasilan (Income Sudah Dilepas)</summary>
+        <ol>
+          <li>Dari Seller Center, menu <strong>Keuangan</strong> → <strong>Penghasilan Saya</strong></li>
+          <li>Verifikasi password kalau diminta</li>
+          <li>Buka <strong>"Catatan Transaksi Penghasilan"</strong>, pilih periode (mingguan/bulanan)</li>
+          <li>Klik ikon <strong>download</strong> di sebelah laporan yang mau diambil</li>
+        </ol>
+      </details>
+
+      <details class="faq-item">
+        <summary>🏦 Laporan Saldo (Balance Transaction Report) — opsional</summary>
+        <ol>
+          <li>Dari Seller Center, menu <strong>Keuangan</strong> → <strong>Saldo Saya</strong></li>
+          <li>Buka tab <strong>"Laporan Transaksi"</strong></li>
+          <li>Atur rentang tanggal, klik <strong>Export/Download</strong></li>
+        </ol>
+        <p class="faq-note">Ini opsional — cuma dipakai buat kartu "Dana Ditarik ke Bank" di Laporan Keuangan.</p>
+      </details>
+    </div>
+
+    <div class="panel cut-corner" style="margin-bottom:20px;">
+      <h3>2. Cara Upload File Excel ke Aplikasi</h3>
+      <div class="accent-cut"></div>
+      <ol>
+        <li>Buka menu yang sesuai jenis file (<strong>Data Penjualan</strong>, <strong>Data Iklan</strong>, atau <strong>Laporan Keuangan</strong>)</li>
+        <li>Klik tombol biru <strong>"↑ Upload..."</strong> di bagian atas halaman</li>
+        <li>Pilih file Excel/CSV yang sudah di-download dari Shopee (dari folder Download HP/PC kamu)</li>
+        <li>Tunggu beberapa detik — muncul pesan <strong>"✅ berhasil disinkron"</strong> kalau sukses</li>
+        <li>Dashboard otomatis update sesuai data yang baru di-upload</li>
+      </ol>
+      <p class="faq-note">Nama file bebas — aplikasi baca dari <strong>isi data</strong>, bukan nama file. Upload ulang file yang sama juga aman, tidak bikin data dobel (sistem otomatis menimpa data lama).</p>
+    </div>
+
+    <div class="panel cut-corner">
+      <h3>3. Cara Menyimpan Laporan Aplikasi (Download PDF)</h3>
+      <div class="accent-cut"></div>
+      <p style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">Laporan Keuangan bisa disimpan jadi file PDF — bisa dikirim ke investor, mitra, atau akuntan tanpa perlu kasih akses login ke aplikasi ini.</p>
+
+      <details class="faq-item">
+        <summary>💻 Laptop / PC</summary>
+        <ol>
+          <li>Buka menu <strong>Laporan Keuangan</strong>, pilih periode yang mau disimpan</li>
+          <li>Klik tombol <strong>"📄 Download PDF"</strong> di atas halaman</li>
+          <li>Muncul jendela <strong>Print</strong> — di bagian <strong>"Tujuan/Destination"</strong>, pilih <strong>"Simpan sebagai PDF" / "Save as PDF"</strong> (bukan nama printer fisik)</li>
+          <li>Klik <strong>Simpan/Save</strong>, pilih folder tujuan di komputer</li>
+        </ol>
+      </details>
+
+      <details class="faq-item">
+        <summary>📱 Android</summary>
+        <ol>
+          <li>Buka menu <strong>Laporan Keuangan</strong>, pilih periode yang mau disimpan</li>
+          <li>Klik tombol <strong>"📄 Download PDF"</strong></li>
+          <li>Muncul preview print — ketuk ikon <strong>panah bawah / Download</strong>, atau di dropdown printer pilih <strong>"Save as PDF"</strong></li>
+          <li>File PDF otomatis masuk ke folder <strong>Download</strong> HP</li>
+        </ol>
+      </details>
+
+      <details class="faq-item">
+        <summary>📱 iPhone</summary>
+        <ol>
+          <li>Buka menu <strong>Laporan Keuangan</strong>, pilih periode yang mau disimpan</li>
+          <li>Klik tombol <strong>"📄 Download PDF"</strong></li>
+          <li>Di preview print Safari, cubit (pinch) layar preview ke arah dalam — ini bikin muncul opsi <strong>share</strong></li>
+          <li>Pilih <strong>"Simpan ke File(s)"</strong> buat nyimpen sebagai PDF ke aplikasi Files</li>
+        </ol>
+      </details>
+
+      <p class="faq-note">PDF yang dihasilkan otomatis cuma berisi ringkasan KPI & tabel laba per series — tombol, menu navigasi, dan pengaturan nggak ikut kebawa, jadi hasilnya rapi buat dibagikan.</p>
+    </div>
+
+  </div><!-- /#page-faq -->
+
 </main>
 
 <footer>
   Sellvix AI · Shopee Business Dashboard
+  · <span id="tenantNameDisplay"></span>
   · <button class="logout-link" style="color:var(--ink-soft);" onclick="logout()">Keluar</button>
 </footer>
 
@@ -549,33 +801,98 @@
 
 <script>
 /* ═══════════════════════════════════════════════════════
-   PASSWORD GATE
-   Ganti "GANTI_PASSWORD_DISINI" dengan password pilihan kamu.
-   Tidak memakai localStorage/browser storage apapun — password
-   harus dimasukkan ulang setiap kali dashboard dibuka, di device manapun.
+   AUTENTIKASI — Firebase Authentication (Email/Password)
+   Setiap toko = 1 akun (uid) terpisah. Data disimpan di
+   tenants/{uid}/... — lihat fungsi tenantCollection() di bawah.
 ═══════════════════════════════════════════════════════ */
-const DASHBOARD_PASSWORD = "12345678";
+let authMode = "signin"; // "signin" | "signup"
+let currentUid = null;
+let currentTenantName = null;
 
-function checkPassword(){
-  const input = document.getElementById("pwInput");
-  if(input.value === DASHBOARD_PASSWORD){
+function toggleAuthMode(){
+  authMode = authMode === "signin" ? "signup" : "signin";
+  const isSignup = authMode === "signup";
+  document.getElementById("signupNamaToko").style.display = isSignup ? "block" : "none";
+  document.getElementById("authSubmitBtn").textContent = isSignup ? "Daftar" : "Masuk";
+  document.getElementById("authModeSub").textContent = isSignup ? "Buat akun toko baru" : "Masuk ke akun toko kamu";
+  document.getElementById("authToggleText").textContent = isSignup ? "Sudah punya akun?" : "Belum punya akun?";
+  document.getElementById("authToggleLink").textContent = isSignup ? "Masuk di sini" : "Daftar di sini";
+  document.getElementById("authError").style.display = "none";
+}
+
+function showAuthError(msg){
+  const el = document.getElementById("authError");
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+function translateAuthError(code){
+  const map = {
+    "auth/email-already-in-use": "Email ini sudah terdaftar. Coba \"Masuk\", bukan \"Daftar\".",
+    "auth/invalid-email": "Format email tidak valid.",
+    "auth/weak-password": "Password minimal 6 karakter.",
+    "auth/user-not-found": "Email belum terdaftar. Coba \"Daftar\" dulu.",
+    "auth/wrong-password": "Password salah.",
+    "auth/invalid-credential": "Email atau password salah.",
+    "auth/missing-password": "Password wajib diisi.",
+    "auth/too-many-requests": "Terlalu banyak percobaan gagal. Coba lagi beberapa saat.",
+  };
+  return map[code] || null;
+}
+
+async function submitAuthForm(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  document.getElementById("authError").style.display = "none";
+
+  if(!email || !password){
+    showAuthError("Email dan password wajib diisi.");
+    return;
+  }
+
+  initFirebase();
+
+  try{
+    if(authMode === "signup"){
+      const namaToko = document.getElementById("signupNamaToko").value.trim();
+      if(!namaToko){ showAuthError("Nama toko wajib diisi."); return; }
+
+      const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
+      currentUid = cred.user.uid;
+      await db.collection("tenants").doc(currentUid).set({
+        nama_toko: namaToko,
+        email: email,
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      currentTenantName = namaToko;
+    } else {
+      const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+      currentUid = cred.user.uid;
+      const tenantDoc = await db.collection("tenants").doc(currentUid).get();
+      currentTenantName = tenantDoc.exists ? tenantDoc.data().nama_toko : "Toko Saya";
+    }
     unlockDashboard();
-  } else {
-    input.classList.add("error");
-    document.getElementById("pwError").textContent = "Password salah, coba lagi.";
-    setTimeout(()=>input.classList.remove("error"), 300);
+  } catch(err){
+    showAuthError(translateAuthError(err.code) || err.message);
   }
 }
 
 function logout(){
-  location.reload();
+  firebase.auth().signOut().finally(() => location.reload());
 }
 
 function unlockDashboard(){
   document.getElementById("loginGate").style.display = "none";
   document.getElementById("app").style.display = "block";
-  initFirebase();
+  document.getElementById("tenantNameDisplay").textContent = currentTenantName || "";
+  loadUploadHistory();
   refreshDashboard();
+}
+
+// Setiap koleksi data toko disimpan bersarang di bawah tenants/{uid}/...
+// supaya data antar-toko otomatis terpisah, tidak tercampur satu sama lain.
+function tenantCollection(name){
+  return db.collection("tenants").doc(currentUid).collection(name);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -771,96 +1088,72 @@ function computeDailySummary(orders, tanggal){
 /* ═══════════════════════════════════════════════════════
    UPLOAD HANDLER
 ═══════════════════════════════════════════════════════ */
-async function handleFileSelect(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  const statusEl = document.getElementById("uploadStatus");
-  statusEl.textContent = `Membaca ${file.name}...`;
+// Fungsi inti pemrosesan file Order (dipanggil dari Upload Zone).
+// Tidak menyentuh elemen DOM spesifik menu — cukup proses & simpan ke Firestore,
+// mengembalikan ringkasan hasilnya.
+async function processOrderFile(file){
+  const buffer = await file.arrayBuffer();
+  const {orders, unknownLog} = parseWorkbook(buffer, file.name);
 
-  try{
-    const buffer = await file.arrayBuffer();
-    const {orders, unknownLog} = parseWorkbook(buffer, file.name);
-
-    statusEl.textContent = `Mengunggah ${orders.length} order ke Firestore...`;
-
-    // batch write orders (max 500 per batch)
-    let batch = db.batch();
-    let count = 0;
-    for(const order of orders){
-      const ref = db.collection("orders").doc(order.no_pesanan);
-      batch.set(ref, order, {merge:true});
-      count++;
-      if(count % 400 === 0){ await batch.commit(); batch = db.batch(); }
-    }
-    await batch.commit();
-
-    // Group order berdasarkan TANGGAL ASLI order (dari data, bukan nama file)
-    // supaya nggak bergantung pada format nama file Shopee, dan otomatis
-    // pecah dengan benar kalau 1 file berisi order dari beberapa hari.
-    const ordersByDate = {};
-    for(const o of orders){
-      let tgl;
-      if(o.waktu_pesanan_dibuat && typeof o.waktu_pesanan_dibuat.toDate === "function"){
-        tgl = fmtLocalDate(o.waktu_pesanan_dibuat.toDate());
-      } else {
-        tgl = tanggalFromFilename(file.name); // fallback kalau tanggal order kosong
-      }
-      if(!ordersByDate[tgl]) ordersByDate[tgl] = [];
-      ordersByDate[tgl].push(o);
-    }
-
-    let totalGmv = 0;
-    let totalFoCount = 0, totalFoOmzet = 0;
-    const tanggalList = Object.keys(ordersByDate).sort();
-    for(const tgl of tanggalList){
-      const allOrdersThatDay = ordersByDate[tgl];
-      const realOrders = allOrdersThatDay.filter(o => !isFakeOrder(o));
-      const foOrders = allOrdersThatDay.filter(o => isFakeOrder(o));
-      totalFoCount += foOrders.length;
-      totalFoOmzet += foOrders.reduce((s,o)=>s+o.total_pembayaran, 0);
-
-      // TIDAK pakai merge:true di sini — summary yang dihitung ulang ini sudah
-      // merepresentasikan kondisi LENGKAP & TERBARU untuk tanggal tsb, jadi kita
-      // timpa bersih dokumennya (bukan digabung), supaya tidak ada sisa data lama
-      // (misal series yang omzetnya sudah 0 karena status order berubah jadi Batal).
-      // Order FO (catatan penjual = "TASIKMALAYA") DIKECUALIKAN dari ringkasan ini,
-      // meskipun tetap tersimpan di koleksi `orders` (dipakai Laporan Keuangan).
-      const summary = computeDailySummary(realOrders, tgl);
-      await db.collection("daily_summary").doc(tgl).set(summary);
-      totalGmv += summary.gmv;
-    }
-
-    // tampilkan log jika ada produk tak dikenali
-    const logEl = document.getElementById("unknownLog");
-    if(unknownLog.length > 0){
-      logEl.classList.add("show");
-      logEl.innerHTML = `<strong>⚠️ ${unknownLog.length} item tidak ke-mapping ke series manapun — cek manual:</strong>` +
-        unknownLog.map(u=>`• [${u.no_pesanan}] ${u.nama_produk}`).join("<br>");
-    } else {
-      logEl.classList.remove("show");
-    }
-
-    const rangeInfo = tanggalList.length > 1
-      ? `${tanggalList.length} hari (${tanggalList[0]}–${tanggalList[tanggalList.length-1]})`
-      : `tanggal ${tanggalList[0]}`;
-    const foInfo = totalFoCount > 0 ? ` · ${totalFoCount} order FO dikecualikan (Rp ${totalFoOmzet.toLocaleString("id-ID")})` : "";
-    statusEl.textContent = `✅ ${file.name} berhasil disinkron (${orders.length - totalFoCount} order, ${rangeInfo}, GMV Rp ${totalGmv.toLocaleString("id-ID")})${foInfo}`;
-    document.getElementById("lastSync").textContent = `Terakhir sync: ${file.name} · ${new Date().toLocaleString("id-ID")}`;
-
-    refreshDashboard();
-  } catch(err){
-    console.error(err);
-    statusEl.textContent = `❌ Gagal: ${err.message}`;
-  } finally {
-    event.target.value = "";
+  // batch write orders (max 500 per batch)
+  let batch = db.batch();
+  let count = 0;
+  for(const order of orders){
+    const ref = tenantCollection("orders").doc(order.no_pesanan);
+    batch.set(ref, order, {merge:true});
+    count++;
+    if(count % 400 === 0){ await batch.commit(); batch = db.batch(); }
   }
+  await batch.commit();
+
+  // Group order berdasarkan TANGGAL ASLI order (dari data, bukan nama file)
+  const ordersByDate = {};
+  for(const o of orders){
+    let tgl;
+    if(o.waktu_pesanan_dibuat && typeof o.waktu_pesanan_dibuat.toDate === "function"){
+      tgl = fmtLocalDate(o.waktu_pesanan_dibuat.toDate());
+    } else {
+      tgl = tanggalFromFilename(file.name);
+    }
+    if(!ordersByDate[tgl]) ordersByDate[tgl] = [];
+    ordersByDate[tgl].push(o);
+  }
+
+  let totalGmv = 0;
+  let totalFoCount = 0, totalFoOmzet = 0;
+  const tanggalList = Object.keys(ordersByDate).sort();
+  for(const tgl of tanggalList){
+    const allOrdersThatDay = ordersByDate[tgl];
+    const realOrders = allOrdersThatDay.filter(o => !isFakeOrder(o));
+    const foOrders = allOrdersThatDay.filter(o => isFakeOrder(o));
+    totalFoCount += foOrders.length;
+    totalFoOmzet += foOrders.reduce((s,o)=>s+o.total_pembayaran, 0);
+
+    const summary = computeDailySummary(realOrders, tgl);
+    await tenantCollection("daily_summary").doc(tgl).set(summary);
+    totalGmv += summary.gmv;
+  }
+
+  const rangeInfo = tanggalList.length > 1
+    ? `${tanggalList.length} hari (${tanggalList[0]}–${tanggalList[tanggalList.length-1]})`
+    : `tanggal ${tanggalList[0]}`;
+  const foInfo = totalFoCount > 0 ? ` · ${totalFoCount} order FO dikecualikan (Rp ${totalFoOmzet.toLocaleString("id-ID")})` : "";
+
+  return {
+    type: "Data Penjualan",
+    detail: `${orders.length - totalFoCount} order, ${rangeInfo}, GMV Rp ${totalGmv.toLocaleString("id-ID")}${foInfo}`,
+    unknownLog,
+  };
 }
 
 // Deteksi FO (fake order/boost) lewat kata sandi di Catatan Penjual.
 // Dipakai untuk mengecualikan dari KPI Data Penjualan (GMV, jumlah order, dst),
 // tapi order-nya tetap disimpan di koleksi `orders` untuk kebutuhan Laporan Keuangan.
+let foKeyword = "TASIKMALAYA"; // default, bisa diubah user lewat "Kelola Pesanan Dikecualikan"
+
 function isFakeOrder(order){
-  return (order.catatan_penjual || "").toUpperCase().includes("TASIKMALAYA");
+  if(!foKeyword) return false;
+  return (order.catatan_penjual || "").toUpperCase().includes(foKeyword.toUpperCase());
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -869,9 +1162,13 @@ function isFakeOrder(order){
 function switchPage(page, el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   el.classList.add("active");
+  document.getElementById("page-upload").style.display = (page === "upload") ? "block" : "none";
   document.getElementById("page-penjualan").style.display = (page === "penjualan") ? "block" : "none";
   document.getElementById("page-iklan").style.display = (page === "iklan") ? "block" : "none";
   document.getElementById("page-keuangan").style.display = (page === "keuangan") ? "block" : "none";
+  document.getElementById("page-faq").style.display = (page === "faq") ? "block" : "none";
+  if(page === "upload") loadUploadHistory();
+  if(page === "penjualan") refreshDashboard();
   if(page === "iklan") initIklanPage();
   if(page === "keuangan") initKeuanganPage();
 }
@@ -1052,58 +1349,40 @@ function combineIklanDocs(docs){
   return { summary, ads };
 }
 
-async function handleIklanFileSelect(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  const statusEl = document.getElementById("iklanUploadStatus");
-  statusEl.textContent = `Membaca ${file.name}...`;
+// Fungsi inti pemrosesan file Data Iklan (dipanggil dari Upload Zone).
+async function processIklanFile(file){
+  const text = await file.text();
+  const parsed = parseAdsFile(text);
+  const summary = computeAdsSummary(parsed.ads);
 
-  try{
-    const text = await file.text();
-    const parsed = parseAdsFile(text);
-    const summary = computeAdsSummary(parsed.ads);
-    const logEl = document.getElementById("iklanLog");
+  const baseDoc = {
+    periode_id: parsed.periodeId,
+    periode_start: parsed.periodeStart,
+    periode_end: parsed.periodeEnd,
+    periode_label: parsed.meta.periode_raw,
+    username: parsed.meta.username,
+    nama_toko: parsed.meta.nama_toko,
+    id_toko: parsed.meta.id_toko,
+    generated_at_shopee: parsed.meta.generated_at,
+    source_file: file.name,
+    uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
+    summary,
+    ads: parsed.ads,
+  };
 
-    if(parsed.unknownLog.length > 0){
-      logEl.classList.add("show");
-      logEl.innerHTML = `<strong>⚠️ ${parsed.unknownLog.length} nama iklan tidak ke-mapping ke series manapun:</strong>` +
-        parsed.unknownLog.map(u=>`• ${u.nama_iklan}`).join("<br>");
-    } else {
-      logEl.classList.remove("show");
-    }
+  await tenantCollection("iklan_reports").doc(parsed.periodeId).set(baseDoc);
 
-    const baseDoc = {
-      periode_id: parsed.periodeId,
-      periode_start: parsed.periodeStart,
-      periode_end: parsed.periodeEnd,
-      periode_label: parsed.meta.periode_raw,
-      username: parsed.meta.username,
-      nama_toko: parsed.meta.nama_toko,
-      id_toko: parsed.meta.id_toko,
-      generated_at_shopee: parsed.meta.generated_at,
-      source_file: file.name,
-      uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
-      summary,
-      ads: parsed.ads,
-    };
+  // langsung pindahkan date-picker Data Iklan ke periode ini biar begitu
+  // user buka menu itu, langsung nunjukin data yang baru di-upload
+  iklanRangeFrom = parsed.periodeStart;
+  iklanRangeTo = parsed.periodeEnd;
+  currentRangeIklan = "custom";
 
-    await db.collection("iklan_reports").doc(parsed.periodeId).set(baseDoc);
-    statusEl.textContent = `✅ ${file.name} disimpan sebagai laporan periode ${parsed.meta.periode_raw}`;
-
-    // langsung pindahkan date-picker ke periode ini biar tampilan utama nunjukin datanya
-    iklanRangeFrom = parsed.periodeStart;
-    iklanRangeTo = parsed.periodeEnd;
-    currentRangeIklan = "custom";
-    const fmtLabel = (idStr) => `${idStr.slice(6,8)}/${idStr.slice(4,6)}`;
-    document.getElementById("iklanRangeLabel").textContent = `${fmtLabel(parsed.periodeStart)} - ${fmtLabel(parsed.periodeEnd)}`;
-    await refreshIklanDashboard();
-    await renderSeriesTrendChart();
-  } catch(err){
-    console.error(err);
-    statusEl.textContent = `❌ Gagal: ${err.message}`;
-  } finally {
-    event.target.value = "";
-  }
+  return {
+    type: "Data Iklan",
+    detail: `Periode ${parsed.meta.periode_raw}, ${parsed.ads.length} campaign`,
+    unknownLog: parsed.unknownLog.map(u => ({ nama_iklan: u.nama_iklan })),
+  };
 }
 
 /* ── Date range picker: kategori bertingkat (Hari Ini / Minggu / Bulan / Kuartal / Semua Data) ── */
@@ -1130,7 +1409,7 @@ async function toggleIklanRangePicker(){
   if(willShow){
     const todayId = fmtLocalDate(new Date());
     try{
-      const doc = await db.collection("iklan_reports").doc(`${todayId}_${todayId}`).get();
+      const doc = await tenantCollection("iklan_reports").doc(`${todayId}_${todayId}`).get();
       todayHasData = doc.exists;
     }catch(e){ todayHasData = false; }
     pickerCategory = null; pickerSubLevel = null; pickerSelectedMonth = null;
@@ -1302,11 +1581,11 @@ async function refreshIklanDashboard(){
 
   let docs = [];
   if(currentRangeIklan === "all"){
-    const snap = await db.collection("iklan_reports").get();
+    const snap = await tenantCollection("iklan_reports").get();
     snap.forEach(doc => docs.push(doc.data()));
   } else {
     // Cari semua laporan yang periodenya TERCAKUP PENUH di rentang [from, to]
-    const snap = await db.collection("iklan_reports")
+    const snap = await tenantCollection("iklan_reports")
       .where("periode_start", ">=", from)
       .where("periode_start", "<=", to)
       .get();
@@ -1377,10 +1656,10 @@ async function generateAiInsight(){
 async function refreshOmzetContribution(combined, from, to){
   let penjualanDocs = [];
   if(currentRangeIklan === "all"){
-    const snap = await db.collection("daily_summary").get();
+    const snap = await tenantCollection("daily_summary").get();
     snap.forEach(doc => penjualanDocs.push(doc.data()));
   } else {
-    const snap = await db.collection("daily_summary")
+    const snap = await tenantCollection("daily_summary")
       .where(firebase.firestore.FieldPath.documentId(), ">=", from)
       .where(firebase.firestore.FieldPath.documentId(), "<=", to)
       .get();
@@ -1429,7 +1708,7 @@ async function refreshOmzetContribution(combined, from, to){
 
 /* ── Fitur: Tren per Series (seluruh riwayat, independen dari filter aktif) ── */
 async function renderSeriesTrendChart(){
-  const snap = await db.collection("iklan_reports").get();
+  const snap = await tenantCollection("iklan_reports").get();
   let allDocs = [];
   snap.forEach(doc => allDocs.push(doc.data()));
   if(allDocs.length === 0) return;
@@ -1648,7 +1927,7 @@ let hppSettings = { AULIA:0, SNTR:0, VOILE:0, ARM:0, "T-NDN":0, ANAK:0 };
 
 async function loadHppSettings(){
   try{
-    const doc = await db.collection("settings").doc("hpp_per_series").get();
+    const doc = await tenantCollection("settings").doc("hpp_per_series").get();
     if(doc.exists) hppSettings = { ...hppSettings, ...doc.data() };
   }catch(e){ console.warn("Gagal load HPP settings:", e); }
 }
@@ -1675,7 +1954,7 @@ async function saveHppSettings(){
   const newSettings = {};
   codes.forEach(code => { newSettings[code] = parseFloat(document.getElementById(`hppInput_${code}`).value) || 0; });
   hppSettings = newSettings;
-  await db.collection("settings").doc("hpp_per_series").set(hppSettings);
+  await tenantCollection("settings").doc("hpp_per_series").set(hppSettings);
   const statusEl = document.getElementById("hppSaveStatus");
   statusEl.textContent = "✅ Tersimpan";
   setTimeout(()=>{ statusEl.textContent = ""; }, 2500);
@@ -1687,9 +1966,14 @@ let excludedOrders = [];
 
 async function loadExcludedOrders(){
   try{
-    const doc = await db.collection("settings").doc("excluded_orders").get();
+    const doc = await tenantCollection("settings").doc("excluded_orders").get();
     excludedOrders = (doc.exists && Array.isArray(doc.data().list)) ? doc.data().list : [];
   }catch(e){ excludedOrders = []; }
+
+  try{
+    const doc = await tenantCollection("settings").doc("fo_keyword").get();
+    foKeyword = (doc.exists && doc.data().keyword) ? doc.data().keyword : "TASIKMALAYA";
+  }catch(e){ foKeyword = "TASIKMALAYA"; }
 }
 
 function toggleExcludedOrders(){
@@ -1698,16 +1982,22 @@ function toggleExcludedOrders(){
   panel.style.display = willShow ? "block" : "none";
   if(willShow){
     document.getElementById("excludedOrdersInput").value = excludedOrders.join("\n");
+    document.getElementById("foKeywordInput").value = foKeyword;
   }
 }
 
 async function saveExcludedOrders(){
   const raw = document.getElementById("excludedOrdersInput").value;
   excludedOrders = raw.split("\n").map(s=>s.trim()).filter(Boolean);
-  await db.collection("settings").doc("excluded_orders").set({ list: excludedOrders });
+  await tenantCollection("settings").doc("excluded_orders").set({ list: excludedOrders });
+
+  const keywordRaw = document.getElementById("foKeywordInput").value.trim();
+  foKeyword = keywordRaw;
+  await tenantCollection("settings").doc("fo_keyword").set({ keyword: foKeyword });
+
   const statusEl = document.getElementById("excludedSaveStatus");
-  statusEl.textContent = `✅ Tersimpan (${excludedOrders.length} pesanan dikecualikan)`;
-  setTimeout(()=>{ statusEl.textContent = ""; }, 3000);
+  statusEl.textContent = `✅ Tersimpan (${excludedOrders.length} pesanan dikecualikan, kata sandi FO: "${foKeyword || "(kosong, nonaktif)"}")`;
+  setTimeout(()=>{ statusEl.textContent = ""; }, 4000);
   await refreshKeuanganDashboard();
 }
 
@@ -1811,72 +2101,59 @@ function computeIncomeDailySummary(dayOrders){
   };
 }
 
-async function handleKeuanganFileSelect(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  const statusEl = document.getElementById("keuanganUploadStatus");
-  statusEl.textContent = `Membaca ${file.name}...`;
+// Fungsi inti pemrosesan file Laporan Penghasilan (dipanggil dari Upload Zone).
+async function processKeuanganFile(file){
+  const buffer = await file.arrayBuffer();
+  const parsed = parseIncomeFile(buffer);
 
-  try{
-    const buffer = await file.arrayBuffer();
-    const parsed = parseIncomeFile(buffer);
+  // Kelompokkan per HARI berdasarkan Tanggal Dana Dilepaskan (bukan periode file)
+  const byDate = {};
+  const noDateOrders = [];
+  parsed.ordersIncome.forEach(o => {
+    if(o.tanggal_dilepas){
+      if(!byDate[o.tanggal_dilepas]) byDate[o.tanggal_dilepas] = [];
+      byDate[o.tanggal_dilepas].push(o);
+    } else {
+      noDateOrders.push(o);
+    }
+  });
 
-    // Kelompokkan per HARI berdasarkan Tanggal Dana Dilepaskan (bukan periode file)
-    const byDate = {};
-    const noDateOrders = [];
-    parsed.ordersIncome.forEach(o => {
-      if(o.tanggal_dilepas){
-        if(!byDate[o.tanggal_dilepas]) byDate[o.tanggal_dilepas] = [];
-        byDate[o.tanggal_dilepas].push(o);
-      } else {
-        noDateOrders.push(o);
-      }
+  const dateKeys = Object.keys(byDate).sort();
+  for(const tgl of dateKeys){
+    const dayOrders = byDate[tgl];
+    const daySummary = computeIncomeDailySummary(dayOrders);
+    await tenantCollection("income_reports").doc(`${tgl}_${tgl}`).set({
+      periode_start: tgl,
+      periode_end: tgl,
+      periode_label: `${tgl.slice(6,8)}/${tgl.slice(4,6)}/${tgl.slice(0,4)}`,
+      source_file: file.name,
+      uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
+      summary: daySummary,
+      orders_income: dayOrders,
     });
-
-    const dateKeys = Object.keys(byDate).sort();
-    for(const tgl of dateKeys){
-      const dayOrders = byDate[tgl];
-      const daySummary = computeIncomeDailySummary(dayOrders);
-      await db.collection("income_reports").doc(`${tgl}_${tgl}`).set({
-        periode_start: tgl,
-        periode_end: tgl,
-        periode_label: `${tgl.slice(6,8)}/${tgl.slice(4,6)}/${tgl.slice(0,4)}`,
-        source_file: file.name,
-        uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
-        summary: daySummary,
-        orders_income: dayOrders,
-      });
-    }
-
-    // Fallback langka: kalau ada baris tanpa tanggal dana dilepas, simpan sbg 1 blok
-    // pakai periode yg tertulis di file (lebih baik dari kehilangan data sama sekali)
-    if(noDateOrders.length > 0){
-      const fallbackSummary = computeIncomeDailySummary(noDateOrders);
-      await db.collection("income_reports").doc(parsed.periodeId).set({
-        periode_start: parsed.periodeStart,
-        periode_end: parsed.periodeEnd,
-        periode_label: `${parsed.periodeLabel} (tanpa tanggal rilis, ${noDateOrders.length} order)`,
-        source_file: file.name,
-        uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
-        summary: fallbackSummary,
-        orders_income: noDateOrders,
-      });
-    }
-
-    statusEl.textContent = `✅ ${file.name} disimpan sebagai ${dateKeys.length} laporan harian (${parsed.periodeLabel})`;
-
-    keuanganRangeFrom = parsed.periodeStart;
-    keuanganRangeTo = parsed.periodeEnd;
-    currentRangeKeuangan = "custom";
-    const fmtLabel = (idStr) => `${idStr.slice(6,8)}/${idStr.slice(4,6)}`;
-    document.getElementById("keuanganRangeLabel").textContent = `${fmtLabel(parsed.periodeStart)} - ${fmtLabel(parsed.periodeEnd)}`;
-    await refreshKeuanganDashboard();
-  } catch(err){
-    console.error(err);
-    statusEl.textContent = `❌ Gagal: ${err.message}`;
-  } finally {
-    event.target.value = "";
   }
+
+  if(noDateOrders.length > 0){
+    const fallbackSummary = computeIncomeDailySummary(noDateOrders);
+    await tenantCollection("income_reports").doc(parsed.periodeId).set({
+      periode_start: parsed.periodeStart,
+      periode_end: parsed.periodeEnd,
+      periode_label: `${parsed.periodeLabel} (tanpa tanggal rilis, ${noDateOrders.length} order)`,
+      source_file: file.name,
+      uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
+      summary: fallbackSummary,
+      orders_income: noDateOrders,
+    });
+  }
+
+  keuanganRangeFrom = parsed.periodeStart;
+  keuanganRangeTo = parsed.periodeEnd;
+  currentRangeKeuangan = "custom";
+
+  return {
+    type: "Laporan Keuangan (Income)",
+    detail: `${dateKeys.length} laporan harian, periode ${parsed.periodeLabel}`,
+  };
 }
 
 function combineIncomeDocs(docs){
@@ -1906,7 +2183,7 @@ async function toggleKeuanganRangePicker(){
   if(willShow){
     const todayId = fmtLocalDate(new Date());
     try{
-      const doc = await db.collection("income_reports").doc(`${todayId}_${todayId}`).get();
+      const doc = await tenantCollection("income_reports").doc(`${todayId}_${todayId}`).get();
       todayHasDataKeu = doc.exists;
     }catch(e){ todayHasDataKeu = false; }
     pickerCategoryKeu = null; pickerSelectedMonthKeu = null;
@@ -2106,13 +2383,117 @@ function renderCoverageNoteKeu(docs, from, to){
 // Ambil data Biaya Iklan (koleksi iklan_reports) untuk rentang [from,to] yang sama
 // dengan yang dipakai Laporan Keuangan — pakai logic yang sama persis kayak
 // Data Iklan (cari yang tercakup penuh + hindari dobel-hitung antar laporan).
+/* ═══════════════════════════════════════════════════════
+   LAPORAN SALDO — "Balance Transaction Report" Shopee
+   Beda dari Laporan Penghasilan: ini buku besar dompet Shopee
+   (uang masuk dari order + uang keluar lewat penarikan ke bank).
+   Arsitektur sama: satu koleksi saldo_reports, dipecah per HARI
+   berdasarkan Tanggal Transaksi asli, konsisten dgn pola lain.
+═══════════════════════════════════════════════════════ */
+
+function parseSaldoFile(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, {type:"array"});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
+
+  let headerIdx = -1, col = {};
+  for(let i=0;i<rows.length;i++){
+    const row = rows[i] || [];
+    const idx = row.indexOf("Tanggal Transaksi");
+    if(idx !== -1){
+      headerIdx = i;
+      col.tanggal = idx;
+      col.tipe = row.indexOf("Tipe Transaksi");
+      col.jumlah = row.indexOf("Jumlah");
+      col.jenis = row.indexOf("Jenis Transaksi");
+      break;
+    }
+  }
+  if(headerIdx === -1) throw new Error("Format file tidak dikenali — kolom 'Tanggal Transaksi' tidak ditemukan.");
+
+  const transaksi = [];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const row = rows[i];
+    if(!row || !row[col.tanggal]) continue;
+    const tglRaw = String(row[col.tanggal]).slice(0,10); // "2026-06-30 22:28:07" -> "2026-06-30"
+    transaksi.push({
+      tanggal: tglRaw.replace(/-/g,""),
+      tipe: row[col.tipe] || "",
+      jumlah: typeof row[col.jumlah]==="number" ? row[col.jumlah] : (parseFloat(row[col.jumlah])||0),
+      jenis: row[col.jenis] || "",
+    });
+  }
+  return { transaksi };
+}
+
+function computeSaldoDailySummary(dayTransaksi){
+  const masuk = dayTransaksi.filter(t => t.jenis === "Transaksi Masuk");
+  const keluar = dayTransaksi.filter(t => t.jenis === "Transaksi Keluar" || t.jumlah < 0);
+  return {
+    total_masuk: masuk.reduce((s,t)=>s+t.jumlah,0),
+    total_keluar: Math.abs(keluar.reduce((s,t)=>s+t.jumlah,0)),
+    count_masuk: masuk.length,
+    count_keluar: keluar.length,
+  };
+}
+
+// Fungsi inti pemrosesan file Laporan Saldo (dipanggil dari Upload Zone).
+async function processSaldoFile(file){
+  const buffer = await file.arrayBuffer();
+  const { transaksi } = parseSaldoFile(buffer);
+
+  const byDate = {};
+  transaksi.forEach(t => { (byDate[t.tanggal] = byDate[t.tanggal]||[]).push(t); });
+
+  const dateKeys = Object.keys(byDate).sort();
+  for(const tgl of dateKeys){
+    await tenantCollection("saldo_reports").doc(`${tgl}_${tgl}`).set({
+      periode_start: tgl,
+      periode_end: tgl,
+      periode_label: `${tgl.slice(6,8)}/${tgl.slice(4,6)}/${tgl.slice(0,4)}`,
+      source_file: file.name,
+      uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
+      summary: computeSaldoDailySummary(byDate[tgl]),
+    });
+  }
+
+  return {
+    type: "Laporan Saldo",
+    detail: `${dateKeys.length} laporan saldo harian`,
+  };
+}
+
+async function getSaldoDataForPeriod(from, to){
+  let docs = [];
+  if(currentRangeKeuangan === "all"){
+    const snap = await tenantCollection("saldo_reports").get();
+    snap.forEach(doc => docs.push(doc.data()));
+  } else {
+    const snap = await tenantCollection("saldo_reports")
+      .where("periode_start", ">=", from)
+      .where("periode_start", "<=", to)
+      .get();
+    snap.forEach(doc => {
+      const d = doc.data();
+      if(d.periode_end <= to) docs.push(d);
+    });
+  }
+  if(docs.length === 0) return { totalKeluar: 0, totalMasuk: 0, hasData: false };
+  docs = removeOverlappingSubsets(docs);
+  return {
+    totalKeluar: docs.reduce((s,d)=>s+(d.summary.total_keluar||0),0),
+    totalMasuk: docs.reduce((s,d)=>s+(d.summary.total_masuk||0),0),
+    hasData: true,
+  };
+}
+
 async function getAdsSpendForPeriod(from, to){
   let adsDocs = [];
   if(currentRangeKeuangan === "all"){
-    const snap = await db.collection("iklan_reports").get();
+    const snap = await tenantCollection("iklan_reports").get();
     snap.forEach(doc => adsDocs.push(doc.data()));
   } else {
-    const snap = await db.collection("iklan_reports")
+    const snap = await tenantCollection("iklan_reports")
       .where("periode_start", ">=", from)
       .where("periode_start", "<=", to)
       .get();
@@ -2138,14 +2519,14 @@ async function getAdsSpendForPeriod(from, to){
 async function computeDanaPending(from, to){
   let ordersSnap;
   if(currentRangeKeuangan === "all"){
-    ordersSnap = await db.collection("orders").get();
+    ordersSnap = await tenantCollection("orders").get();
   } else {
     const fromDate = ymdToDate(from);
     const toDate = ymdToDate(to);
     toDate.setHours(23,59,59,999);
     const tsFrom = firebase.firestore.Timestamp.fromDate(fromDate);
     const tsTo = firebase.firestore.Timestamp.fromDate(toDate);
-    ordersSnap = await db.collection("orders")
+    ordersSnap = await tenantCollection("orders")
       .where("waktu_pesanan_dibuat", ">=", tsFrom)
       .where("waktu_pesanan_dibuat", "<=", tsTo)
       .get();
@@ -2158,7 +2539,7 @@ async function computeDanaPending(from, to){
   });
 
   // Kumpulkan SEMUA No. Pesanan yang pernah muncul di laporan Income manapun
-  const allIncomeSnap = await db.collection("income_reports").get();
+  const allIncomeSnap = await tenantCollection("income_reports").get();
   const releasedSet = new Set();
   allIncomeSnap.forEach(doc => {
     (doc.data().orders_income||[]).forEach(o => releasedSet.add(o.no_pesanan));
@@ -2176,10 +2557,10 @@ async function computeDanaPending(from, to){
 async function getPenjualanStatsForPeriod(from, to){
   let days = [];
   if(currentRangeKeuangan === "all"){
-    const snap = await db.collection("daily_summary").get();
+    const snap = await tenantCollection("daily_summary").get();
     snap.forEach(doc => days.push(doc.data()));
   } else {
-    const snap = await db.collection("daily_summary")
+    const snap = await tenantCollection("daily_summary")
       .where(firebase.firestore.FieldPath.documentId(), ">=", from)
       .where(firebase.firestore.FieldPath.documentId(), "<=", to)
       .get();
@@ -2203,10 +2584,10 @@ async function refreshKeuanganDashboard(){
 
   let incomeDocs = [];
   if(currentRangeKeuangan === "all"){
-    const snap = await db.collection("income_reports").get();
+    const snap = await tenantCollection("income_reports").get();
     snap.forEach(doc => incomeDocs.push(doc.data()));
   } else {
-    const snap = await db.collection("income_reports")
+    const snap = await tenantCollection("income_reports")
       .where("periode_start", ">=", from)
       .where("periode_start", "<=", to)
       .get();
@@ -2245,8 +2626,9 @@ async function refreshKeuanganDashboard(){
   // nanti bakal jadi omzet/penghasilan begitu Shopee merilis dananya.
   const danaPending = await computeDanaPending(from, to);
   const penjualanStats = await getPenjualanStatsForPeriod(from, to);
+  const saldoData = await getSaldoDataForPeriod(from, to);
 
-  renderKeuanganKPI(incomeSummary, profitResult, adsBySeriesData, danaPending, penjualanStats);
+  renderKeuanganKPI(incomeSummary, profitResult, adsBySeriesData, danaPending, penjualanStats, saldoData);
   renderKeuanganSeriesTable(profitResult, adsBySeriesData);
 }
 
@@ -2273,7 +2655,7 @@ async function computeSeriesProfitFromOrders(ordersIncomeList){
   const results = await Promise.all(
     filteredList.map(async (inc) => {
       try{
-        const doc = await db.collection("orders").doc(inc.no_pesanan).get();
+        const doc = await tenantCollection("orders").doc(inc.no_pesanan).get();
         return { inc, order: doc.exists ? doc.data() : null };
       }catch(e){ return { inc, order: null }; }
     })
@@ -2288,7 +2670,7 @@ async function computeSeriesProfitFromOrders(ordersIncomeList){
     }
     // Deteksi otomatis FO (fake order/boost) lewat kata sandi di Catatan Penjual
     const catatanPenjual = (order.catatan_penjual || "").toUpperCase();
-    if(catatanPenjual.includes("TASIKMALAYA")){
+    if(foKeyword && catatanPenjual.includes(foKeyword.toUpperCase())){
       excludedCount++;
       excludedTotal += inc.total_penghasilan;
       continue;
@@ -2313,7 +2695,7 @@ async function computeSeriesProfitFromOrders(ordersIncomeList){
   };
 }
 
-function renderKeuanganKPI(incomeSummary, profitResult, adsData, danaPending, penjualanStats){
+function renderKeuanganKPI(incomeSummary, profitResult, adsData, danaPending, penjualanStats, saldoData){
   const { bySeries, matched, unmatched, unmatchedTotal, unmatchedOrders, excludedCount, excludedTotal, matchRate } = profitResult;
 
   // Baris 1: Omzet Kotor = Pesanan Selesai + Pesanan Sedang Dikirim (langsung dari Data Penjualan)
@@ -2358,6 +2740,7 @@ function renderKeuanganKPI(incomeSummary, profitResult, adsData, danaPending, pe
     {label:"Dana Pending", value:`Rp ${Math.round(danaPending.total).toLocaleString("id-ID")}`, sub:`Dana belum dirilis Shopee`},
     {label:"Margin", value:`${margin.toFixed(1)}%`, warn: margin<10, sub:"Laba Bersih ÷ Omzet Kotor"},
     {label:"Order Tercocokkan", value:`${matchRate.toFixed(1)}%`, sub:`${matched}/${matched+unmatched} order`, warn: matchRate<70},
+    {label:"Dana Ditarik ke Bank", value:`Rp ${Math.round(saldoData.totalKeluar).toLocaleString("id-ID")}`, sub: saldoData.hasData ? "Penarikan ke rekening bank" : "Belum ada Laporan Saldo"},
   ];
   document.getElementById("keuanganKpiGrid").innerHTML = cards.map(c=>`
     <div class="kpi-card cut-corner ${c.warn?'warn':''}">
@@ -2372,7 +2755,7 @@ function renderKeuanganKPI(incomeSummary, profitResult, adsData, danaPending, pe
     logHtml += `<strong>⚠️ Belum ada data Data Iklan untuk periode ini</strong> — Biaya Iklan dianggap Rp 0, Laba Bersih di atas belum termasuk potongan biaya iklan. Upload laporan iklan untuk periode yang sama supaya Laba Bersih lebih akurat.<br><br>`;
   }
   if(excludedCount > 0){
-    logHtml += `<strong>🚫 ${excludedCount} pesanan (Rp ${Math.round(excludedTotal).toLocaleString("id-ID")}) dikecualikan dari perhitungan</strong> — terdeteksi sebagai FO (catatan penjual mengandung "TASIKMALAYA") atau ditandai manual.<br><br>`;
+    logHtml += `<strong>🚫 ${excludedCount} pesanan (Rp ${Math.round(excludedTotal).toLocaleString("id-ID")}) dikecualikan dari perhitungan</strong> — terdeteksi sebagai FO (catatan penjual mengandung kata sandi FO) atau ditandai manual.<br><br>`;
   }
   if(unmatched > 0){
     const orderList = unmatchedOrders
@@ -2429,6 +2812,13 @@ function renderKeuanganSeriesTable(profitResult, adsData){
   document.getElementById("keuanganSeriesBody").innerHTML = html || `<tr><td colspan="9" style="text-align:center; color:var(--text-soft);">Belum ada data</td></tr>`;
 }
 
+function downloadKeuanganPDF(){
+  const periodeLabel = document.getElementById("keuanganRangeLabel").textContent;
+  document.getElementById("printHeaderPeriode").textContent = `Periode: ${periodeLabel}`;
+  document.getElementById("printHeaderDate").textContent = `Dibuat pada ${new Date().toLocaleString("id-ID")}`;
+  window.print();
+}
+
 async function initKeuanganPage(){
   await loadHppSettings();
   await loadExcludedOrders();
@@ -2461,7 +2851,7 @@ async function togglePenjualanRangePicker(){
   if(willShow){
     const todayId = fmtLocalDate(new Date());
     try{
-      const doc = await db.collection("daily_summary").doc(todayId).get();
+      const doc = await tenantCollection("daily_summary").doc(todayId).get();
       todayHasDataPenj = doc.exists;
     }catch(e){ todayHasDataPenj = false; }
     pickerCategoryPenj = null; pickerSelectedMonthPenj = null;
@@ -2624,7 +3014,7 @@ function getRangeDates(){
 
 async function refreshDashboard(){
   const [from, to] = getRangeDates();
-  const snap = await db.collection("daily_summary")
+  const snap = await tenantCollection("daily_summary")
     .where(firebase.firestore.FieldPath.documentId(), ">=", from)
     .where(firebase.firestore.FieldPath.documentId(), "<=", to)
     .get();
@@ -2782,6 +3172,306 @@ function renderTopCities(days){
     || `<tr><td colspan="2" style="text-align:center; color:var(--ink-soft);">Belum ada data</td></tr>`;
 }
 
+/* ═══════════════════════════════════════════════════════
+   CHATBOT BANTUAN — FAQ per kategori menu + eskalasi ke WhatsApp Admin
+═══════════════════════════════════════════════════════ */
+const ADMIN_WHATSAPP_NUMBER = "6285121104529";
+
+const CHATBOT_CATEGORIES = [
+  {
+    label: "📦 Data Penjualan",
+    questions: [
+      {
+        q: "Bagaimana cara upload Data Penjualan?",
+        a: "Buka menu Data Penjualan, klik tombol \"↑ Upload Excel Harian\", pilih file Order All yang sudah di-download dari Shopee (Pesanan Saya → Export). Sistem otomatis baca isi filenya, nggak peduli nama filenya apa."
+      },
+      {
+        q: "Kenapa GMV saya lebih kecil dari yang saya kira?",
+        a: "GMV cuma dihitung dari order berstatus <strong>Selesai</strong> — order yang masih \"Sedang Dikirim\"/\"Telah Dikirim\" belum ikut dihitung karena masih bisa batal/retur. Cek kartu \"Pesanan Sedang Dikirim\" buat lihat potensi omzet yang belum final itu."
+      },
+      {
+        q: "Apa bedanya \"Pesanan Selesai\" dan \"Pesanan Sedang Dikirim\"?",
+        a: "\"Pesanan Selesai\" itu order yang sudah final/tuntas (dikonfirmasi diterima pembeli) — nilainya masuk GMV. \"Pesanan Sedang Dikirim\" itu order yang masih dalam proses kirim, belum final, jadi belum ikut GMV."
+      },
+      {
+        q: "Bagaimana FO (Fake Order) terdeteksi?",
+        a: "Aplikasi mendeteksi lewat kata sandi yang kamu atur sendiri di kolom Catatan Penjual pada file Excel (setting ada di \"🚫 Kelola Pesanan Dikecualikan\", Laporan Keuangan). Order dengan kata itu otomatis dikecualikan dari GMV dan semua KPI, tapi tetap tersimpan di database."
+      },
+    ]
+  },
+  {
+    label: "📢 Data Iklan",
+    questions: [
+      {
+        q: "Bagaimana cara upload Data Iklan?",
+        a: "Buka menu Data Iklan, klik \"↑ Upload Laporan Iklan\", pilih file CSV \"Semua Laporan Iklan CPC\" dari Shopee Ads Center. Periode file bebas — harian, mingguan, atau bulanan."
+      },
+      {
+        q: "Kenapa Biaya Iklan tidak muncul di Laporan Keuangan?",
+        a: "Laporan Keuangan otomatis ambil Biaya Iklan dari periode yang sama di Data Iklan. Kalau belum ada data Data Iklan buat periode itu, akan muncul peringatan \"Belum ada data Data Iklan untuk periode ini\" dan Biaya Iklan dianggap Rp0 sementara."
+      },
+      {
+        q: "Bagaimana cara lihat performa iklan per minggu/bulan tertentu?",
+        a: "Klik tombol \"Pilih Periode\" di Data Iklan, pilih kategori Minggu/Bulan/Kuartal, lalu pilih rentang yang diinginkan. Sistem otomatis gabungkan laporan yang relevan dan hindari dobel-hitung kalau ada yang tumpang tindih."
+      },
+    ]
+  },
+  {
+    label: "💰 Laporan Keuangan",
+    questions: [
+      {
+        q: "Kenapa Omzet Kotor beda dengan Penghasilan Bersih?",
+        a: "Omzet Kotor itu nilai jual asli (sebelum dipotong apapun). Penghasilan Bersih itu dana yang beneran cair dari Shopee, sudah dipotong Admin Shopee, Komisi Affiliate, dan biaya lainnya. Selisihnya dirinci di kartu-kartu KPI lainnya."
+      },
+      {
+        q: "Apa itu \"Dana Pending\"?",
+        a: "Order yang sudah berstatus Selesai, tapi dananya belum pernah muncul di laporan Income manapun yang di-upload — biasanya karena Shopee belum merilis dananya. Bukan kerugian, nanti otomatis jadi omzet begitu Shopee merilis dananya."
+      },
+      {
+        q: "Apa itu HPP dan bagaimana cara mengaturnya?",
+        a: "HPP (modal produksi per pcs) diisi manual di tombol \"⚙️ Setting HPP per Series\" di Laporan Keuangan — cukup sekali, ubah lagi kalau modal produksi berubah. Dipakai buat hitung Laba Bersih per series."
+      },
+      {
+        q: "Bagaimana cara download laporan jadi PDF?",
+        a: "Klik tombol \"📄 Download PDF\" di Laporan Keuangan. Muncul jendela Print — pilih \"Simpan sebagai PDF\" di bagian Tujuan/Destination, lalu Save."
+      },
+    ]
+  },
+  {
+    label: "📖 Umum & Panduan",
+    questions: [
+      {
+        q: "Bagaimana cara download laporan dari Shopee?",
+        a: "Ada 4 jenis file: Data Penjualan (Pesanan Saya → Export), Data Iklan (Iklan Shopee → Unduh Laporan), Laporan Penghasilan & Laporan Saldo (keduanya di menu Keuangan Seller Center). Langkah detail lengkap ada di menu <strong>Panduan</strong> di navigasi atas."
+      },
+      {
+        q: "File apa saja yang wajib di-upload tiap bulan?",
+        a: "3 file wajib: Order All (Data Penjualan), Laporan Iklan CPC (Data Iklan), dan Laporan Penghasilan (Laporan Keuangan). Laporan Saldo sifatnya opsional, cuma buat kartu \"Dana Ditarik ke Bank\"."
+      },
+      {
+        q: "Upload ulang file yang sama, apakah datanya jadi dobel?",
+        a: "Tidak. Sistem selalu menghitung ulang dari isi file yang diupload dan menimpa data lama untuk tanggal yang sama — aman diupload ulang kapan saja."
+      },
+    ]
+  },
+];
+
+let chatbotActiveCategory = null;
+
+function toggleChatbot(){
+  const panel = document.getElementById("chatbotPanel");
+  const willShow = panel.style.display === "none";
+  panel.style.display = willShow ? "flex" : "none";
+  if(willShow && document.getElementById("chatbotBody").children.length === 0){
+    renderChatbotGreeting();
+  }
+}
+
+function renderChatbotGreeting(){
+  const body = document.getElementById("chatbotBody");
+  body.innerHTML = "";
+  addChatBubble("bot", "Halo! 👋 Ada yang bisa saya bantu? Pilih kategori menu di bawah, atau chat langsung ke admin kalau butuh bantuan lebih detail.");
+  renderChatbotCategoryList();
+}
+
+function addChatBubble(sender, html){
+  const body = document.getElementById("chatbotBody");
+  const bubble = document.createElement("div");
+  bubble.className = `chatbot-bubble ${sender}`;
+  bubble.innerHTML = html;
+  body.appendChild(bubble);
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearChatbotOptionList(){
+  const existing = document.getElementById("chatbotOptionList");
+  if(existing) existing.remove();
+  const existingBack = document.getElementById("chatbotBackBtn");
+  if(existingBack) existingBack.remove();
+}
+
+function renderChatbotCategoryList(){
+  clearChatbotOptionList();
+  const body = document.getElementById("chatbotBody");
+  const wrap = document.createElement("div");
+  wrap.id = "chatbotOptionList";
+  wrap.innerHTML = CHATBOT_CATEGORIES.map((cat, idx) =>
+    `<div class="chatbot-question-btn" onclick="selectChatbotCategory(${idx})">${cat.label}</div>`
+  ).join("");
+  body.appendChild(wrap);
+  body.scrollTop = body.scrollHeight;
+}
+
+function selectChatbotCategory(catIdx){
+  chatbotActiveCategory = catIdx;
+  clearChatbotOptionList();
+  renderChatbotQuestionList(catIdx);
+}
+
+function renderChatbotQuestionList(catIdx){
+  const body = document.getElementById("chatbotBody");
+  const wrap = document.createElement("div");
+  wrap.id = "chatbotOptionList";
+  wrap.innerHTML = CHATBOT_CATEGORIES[catIdx].questions.map((item, qIdx) =>
+    `<div class="chatbot-question-btn" onclick="selectFaqQuestion(${catIdx}, ${qIdx})">${item.q}</div>`
+  ).join("");
+  body.appendChild(wrap);
+
+  const backBtn = document.createElement("div");
+  backBtn.id = "chatbotBackBtn";
+  backBtn.className = "chatbot-back-btn";
+  backBtn.textContent = "‹ Kembali ke kategori";
+  backBtn.onclick = () => { clearChatbotOptionList(); renderChatbotCategoryList(); };
+  body.appendChild(backBtn);
+  body.scrollTop = body.scrollHeight;
+}
+
+function selectFaqQuestion(catIdx, qIdx){
+  const item = CHATBOT_CATEGORIES[catIdx].questions[qIdx];
+  clearChatbotOptionList();
+
+  addChatBubble("user", item.q);
+  addChatBubble("bot", item.a);
+
+  const backBtn = document.createElement("div");
+  backBtn.className = "chatbot-back-btn";
+  backBtn.textContent = "‹ Pertanyaan lain";
+  backBtn.onclick = () => { backBtn.remove(); renderChatbotQuestionList(chatbotActiveCategory); };
+  document.getElementById("chatbotBody").appendChild(backBtn);
+}
+
+function openWhatsAppAdmin(){
+  const pesan = encodeURIComponent("Halo, saya butuh bantuan soal aplikasi Sellvix AI.");
+  window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${pesan}`, "_blank");
+}
+
+/* ═══════════════════════════════════════════════════════
+   UPLOAD ZONE — satu pintu upload buat semua jenis file,
+   deteksi otomatis dari ISI data (bukan nama file), lalu
+   diarahkan ke fungsi pemrosesan yang sesuai.
+═══════════════════════════════════════════════════════ */
+
+async function detectAndProcessFile(file){
+  const name = file.name.toLowerCase();
+
+  // CSV -> selalu Data Iklan (satu-satunya jenis file yang formatnya CSV)
+  if(name.endsWith(".csv")){
+    return await processIklanFile(file);
+  }
+
+  // Excel -> intip nama sheet & header buat nentuin jenisnya
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, {type:"array"});
+
+  if(wb.SheetNames.includes("Transaction Report")){
+    return await processSaldoFile(file);
+  }
+  if(wb.SheetNames.includes("Summary") && wb.SheetNames.includes("Income")){
+    return await processKeuanganFile(file);
+  }
+
+  // Cek header kolom di sheet pertama buat pastiin ini file Order
+  const firstSheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(firstSheet, {header:1, defval:null});
+  const headerRow = rows[0] || [];
+  if(headerRow.includes("No. Pesanan") && headerRow.includes("Status Pesanan")){
+    return await processOrderFile(file);
+  }
+
+  throw new Error("Jenis file tidak dikenali — pastikan file yang diupload adalah Order All, Laporan Iklan, Laporan Penghasilan, atau Laporan Saldo dari Shopee.");
+}
+
+async function saveUploadHistory(entry){
+  await tenantCollection("upload_history").add({
+    ...entry,
+    uploaded_at: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function loadUploadHistory(){
+  const tbody = document.getElementById("uploadHistoryBody");
+  try{
+    const snap = await tenantCollection("upload_history").orderBy("uploaded_at", "desc").limit(20).get();
+    if(snap.empty){
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-soft);">Belum ada riwayat upload</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = snap.docs.map(doc => {
+      const d = doc.data();
+      const waktu = d.uploaded_at && d.uploaded_at.toDate ? d.uploaded_at.toDate().toLocaleString("id-ID") : "-";
+      const statusBadge = d.status === "error"
+        ? `<span style="color:var(--danger);">❌ Gagal</span>`
+        : `<span style="color:#1a9c5f;">✅ Berhasil</span>`;
+      return `<tr>
+        <td class="mono" style="font-size:12px;">${waktu}</td>
+        <td>${d.filename}</td>
+        <td>${d.type || "-"}</td>
+        <td style="font-size:12.5px; color:var(--text-soft);">${d.detail || ""}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
+    }).join("");
+  } catch(err){
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-soft);">Gagal memuat riwayat: ${err.message}</td></tr>`;
+  }
+}
+
+function addUploadProgressItem(filename){
+  const wrap = document.getElementById("uploadZoneProgress");
+  const item = document.createElement("div");
+  item.className = "upload-progress-item";
+  item.id = `progress-${filename.replace(/[^a-zA-Z0-9]/g,"_")}`;
+  item.innerHTML = `⏳ <span>${filename} — memproses...</span>`;
+  wrap.appendChild(item);
+  return item;
+}
+
+async function processFileList(files){
+  document.getElementById("uploadZoneProgress").innerHTML = "";
+  let anySuccessPenjualan = false, anySuccessIklan = false, anySuccessKeuangan = false;
+
+  for(const file of files){
+    const progressItem = addUploadProgressItem(file.name);
+    try{
+      const result = await detectAndProcessFile(file);
+      progressItem.innerHTML = `✅ <span><strong>${file.name}</strong> — ${result.type}: ${result.detail}</span>`;
+      await saveUploadHistory({ filename: file.name, type: result.type, detail: result.detail, status: "success" });
+
+      if(result.type === "Data Penjualan") anySuccessPenjualan = true;
+      if(result.type === "Data Iklan") anySuccessIklan = true;
+      if(result.type.startsWith("Laporan Keuangan") || result.type === "Laporan Saldo") anySuccessKeuangan = true;
+
+      if(result.unknownLog && result.unknownLog.length > 0){
+        progressItem.innerHTML += `<br><span style="color:#B8860B; font-size:12px;">⚠️ ${result.unknownLog.length} item tidak ke-mapping ke series manapun</span>`;
+      }
+    } catch(err){
+      console.error(err);
+      progressItem.innerHTML = `❌ <span><strong>${file.name}</strong> — Gagal: ${err.message}</span>`;
+      await saveUploadHistory({ filename: file.name, type: "Tidak dikenali", detail: err.message, status: "error" });
+    }
+  }
+
+  document.getElementById("lastSync").textContent = `Terakhir sync: ${new Date().toLocaleString("id-ID")}`;
+  await loadUploadHistory();
+
+  // refresh dashboard yang relevan di belakang layar, biar begitu user pindah menu datanya udah update
+  if(anySuccessPenjualan) refreshDashboard();
+  if(anySuccessIklan){ refreshIklanDashboard(); renderSeriesTrendChart(); }
+  if(anySuccessKeuangan) refreshKeuanganDashboard();
+}
+
+function handleUploadZoneDrop(event){
+  event.preventDefault();
+  document.getElementById("uploadZone").classList.remove("dragover");
+  const files = Array.from(event.dataTransfer.files);
+  if(files.length > 0) processFileList(files);
+}
+
+function handleUploadZoneSelect(event){
+  const files = Array.from(event.target.files);
+  if(files.length > 0) processFileList(files);
+  event.target.value = "";
+}
+
 // (refreshDashboard dipanggil otomatis setelah login berhasil via unlockDashboard())
 
 // Registrasi service worker untuk PWA (caching app-shell, bukan offline data)
@@ -2793,5 +3483,23 @@ if("serviceWorker" in navigator){
   });
 }
 </script>
+
+<!-- ═══ Chatbot Bantuan (FAQ + Chat Admin via WhatsApp) ═══ -->
+<button class="chatbot-fab" id="chatbotFab" onclick="toggleChatbot()">💬</button>
+
+<div class="chatbot-panel" id="chatbotPanel" style="display:none;">
+  <div class="chatbot-header">
+    <div>
+      <div class="chatbot-header-title">Bantuan Sellvix AI</div>
+      <div class="chatbot-header-sub">Biasanya balas dalam beberapa menit</div>
+    </div>
+    <span class="chatbot-close" onclick="toggleChatbot()">✕</span>
+  </div>
+  <div class="chatbot-body" id="chatbotBody"></div>
+  <div class="chatbot-footer">
+    <button class="chatbot-admin-btn" onclick="openWhatsAppAdmin()">💬 Chat Admin via WhatsApp</button>
+  </div>
+</div>
+
 </body>
 </html>
