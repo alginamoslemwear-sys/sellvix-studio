@@ -401,6 +401,17 @@
 
     <button class="btn btn-primary" id="authSubmitBtn" onclick="submitAuthForm()">Masuk</button>
 
+    <div style="display:flex; align-items:center; gap:10px; margin:16px 0; color:rgba(255,255,255,0.4); font-size:12px;">
+      <div style="flex:1; height:1px; background:rgba(255,255,255,0.15);"></div>
+      atau
+      <div style="flex:1; height:1px; background:rgba(255,255,255,0.15);"></div>
+    </div>
+
+    <button class="btn btn-ghost" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="signInWithGoogle()">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.6 5.1 29.6 3 24 3c-7.7 0-14.4 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 45c5.5 0 10.4-1.8 14.2-5l-6.6-5.4c-2 1.4-4.6 2.3-7.6 2.3-5.3 0-9.7-3.4-11.3-8.1l-6.6 5.1C9.5 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.4C41.5 35.8 45 30.4 45 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+      Masuk dengan Google
+    </button>
+
     <div style="margin-top:16px; font-size:13px; text-align:center; color:rgba(255,255,255,0.7);">
       <span id="authToggleText">Belum punya akun?</span>
       <a href="#" onclick="toggleAuthMode(); return false;" id="authToggleLink" style="color:#fff; font-weight:600;">Daftar di sini</a>
@@ -870,6 +881,42 @@ async function submitAuthForm(){
       currentUid = cred.user.uid;
       const tenantDoc = await db.collection("tenants").doc(currentUid).get();
       currentTenantName = tenantDoc.exists ? tenantDoc.data().nama_toko : "Toko Saya";
+    }
+    unlockDashboard();
+  } catch(err){
+    showAuthError(translateAuthError(err.code) || err.message);
+  }
+}
+
+async function signInWithGoogle(){
+  document.getElementById("authError").style.display = "none";
+  initFirebase();
+
+  try{
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const cred = await firebase.auth().signInWithPopup(provider);
+    currentUid = cred.user.uid;
+
+    const tenantDoc = await db.collection("tenants").doc(currentUid).get();
+    if(tenantDoc.exists){
+      currentTenantName = tenantDoc.data().nama_toko;
+    } else {
+      // Akun Google baru — belum punya profil toko, minta nama toko sekali
+      let namaToko = "";
+      while(!namaToko){
+        namaToko = prompt("Sepertinya ini pertama kalinya kamu masuk. Masukkan nama toko kamu:", cred.user.displayName || "");
+        if(namaToko === null){ // user batal isi nama toko
+          await firebase.auth().signOut();
+          return;
+        }
+        namaToko = (namaToko || "").trim();
+      }
+      await db.collection("tenants").doc(currentUid).set({
+        nama_toko: namaToko,
+        email: cred.user.email || "",
+        created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      currentTenantName = namaToko;
     }
     unlockDashboard();
   } catch(err){
@@ -3472,6 +3519,8 @@ function handleUploadZoneSelect(event){
   event.target.value = "";
 }
 
+// Migrasi 1x-pakai: pindahkan data lama (sebelum ada sistem akun, tersimpan
+// "rata" tanpa pemilik) ke akun yang sedang login sekarang.
 // (refreshDashboard dipanggil otomatis setelah login berhasil via unlockDashboard())
 
 // Registrasi service worker untuk PWA (caching app-shell, bukan offline data)
