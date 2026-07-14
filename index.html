@@ -23,6 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
@@ -243,12 +244,22 @@
   @media print{
     body{ background:#fff !important; }
     header, .no-print, .daterange-wrap, .upload-row, .upload-row + p,
-    #hppSettingsPanel, #excludedOrdersPanel, #keuanganLog{ display:none !important; }
+    #hppSettingsPanel, #excludedOrdersPanel, #keuanganLog,
+    .chatbot-fab, .chatbot-panel{ display:none !important; }
     .print-header{ display:block !important; }
     main{ max-width:100%; padding:0; }
     .kpi-card, .panel{ box-shadow:none !important; border:1px solid #ccc !important; break-inside:avoid; }
     .kpi-grid-4{ grid-template-columns:repeat(3,1fr) !important; }
   }
+
+  /* Dipakai saat generate PDF langsung (html2pdf) — meniru aturan @media print
+     di atas, supaya elemen yang sama juga tersembunyi saat di-screenshot. */
+  body.force-print header, body.force-print .no-print, body.force-print .daterange-wrap,
+  body.force-print .upload-row, body.force-print .upload-row + p,
+  body.force-print #hppSettingsPanel, body.force-print #excludedOrdersPanel, body.force-print #keuanganLog,
+  body.force-print .chatbot-fab, body.force-print .chatbot-panel{ display:none !important; }
+  body.force-print .print-header{ display:block !important; }
+  body.force-print .kpi-grid-4{ grid-template-columns:repeat(3,1fr) !important; }
 
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   th{
@@ -492,6 +503,13 @@
     <!-- diisi JS -->
   </div>
 
+  <div class="panel cut-corner" id="autoInsightsPanel" style="margin-bottom:20px; display:none;">
+    <h3>📊 Analisa Otomatis</h3>
+    <div class="accent-cut"></div>
+    <div id="autoInsightsBody" style="display:flex; flex-direction:column; gap:10px;"></div>
+    <p style="font-size:11px; color:var(--text-soft); margin-top:12px;">Dihitung otomatis dari angka yang ada — bukan dari AI, murni perbandingan data.</p>
+  </div>
+
   <div class="grid-2">
     <div class="panel cut-corner">
       <h3>Tren GMV</h3>
@@ -555,6 +573,13 @@
 
       <div class="kpi-grid-4" id="iklanKpiGrid"></div>
 
+      <div class="panel cut-corner" id="iklanAutoInsightsPanel" style="margin-bottom:20px; display:none;">
+        <h3>📊 Analisa Otomatis</h3>
+        <div class="accent-cut"></div>
+        <div id="iklanAutoInsightsBody" style="display:flex; flex-direction:column; gap:10px;"></div>
+        <p style="font-size:11px; color:var(--text-soft); margin-top:12px;">Dihitung otomatis dari angka yang ada — bukan dari AI, murni perbandingan data.</p>
+      </div>
+
       <div class="grid-2">
         <div class="panel cut-corner">
           <h3>Belanja &amp; Omzet per Series</h3>
@@ -581,8 +606,6 @@
       <div class="panel cut-corner">
         <h3>Detail per Campaign</h3>
         <div class="accent-cut"></div>
-        <button class="btn btn-primary" style="margin-bottom:16px;" onclick="generateAiInsight()">✨ Ringkasan AI</button>
-        <div id="aiInsightBox" style="display:none; background:var(--blue-pale); border:1px solid var(--blue-soft); border-radius:12px; padding:16px 18px; margin-bottom:18px; font-size:13.5px; line-height:1.75; white-space:pre-wrap; color:var(--navy);"></div>
         <table>
           <thead><tr>
             <th>Nama Iklan</th><th>Series</th>
@@ -616,17 +639,47 @@
     </p>
 
     <div class="panel cut-corner" id="hppSettingsPanel" style="display:none; margin-bottom:20px;">
-      <h3>HPP (Modal Produksi) per Series</h3>
+      <h3>Setting Produk & HPP per Series</h3>
       <div class="accent-cut"></div>
-      <p style="font-size:12px; color:var(--text-soft); margin-bottom:14px;">Masukkan modal produksi per pcs untuk tiap series. Ini dipakai untuk hitung laba bersih — cukup diisi sekali, ubah lagi kalau modalnya berubah.</p>
-      <div id="hppInputGrid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px;"></div>
-      <button class="btn btn-primary" onclick="saveHppSettings()">Simpan HPP</button>
+      <p style="font-size:12px; color:var(--text-soft); margin-bottom:14px;">
+        Daftarkan produk/series toko kamu — dipakai buat mengelompokkan penjualan otomatis (dicocokkan ke <strong>SKU dulu</strong> kalau ada & cocok persis, fallback ke <strong>kata kunci</strong> yang muncul di Nama Produk) dan menghitung HPP (modal produksi) buat Laba Bersih.
+      </p>
+
+      <table style="margin-bottom:16px;">
+        <thead><tr>
+          <th>Nama Produk/Series</th><th>SKU / Kata Kunci</th><th>HPP per pcs</th><th style="width:40px;"></th>
+        </tr></thead>
+        <tbody id="productSeriesBody"></tbody>
+      </table>
+
+      <div style="display:grid; grid-template-columns:2fr 2fr 1.2fr auto; gap:10px; margin-bottom:16px; align-items:end;">
+        <div>
+          <label style="font-size:11.5px; color:var(--text-soft); display:block; margin-bottom:4px;">Nama Produk/Series</label>
+          <input type="text" id="newProdukNama" placeholder="misal: Aulia" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11.5px; color:var(--text-soft); display:block; margin-bottom:4px;">SKU / Kata Kunci</label>
+          <input type="text" id="newProdukSku" placeholder="misal: aulia atau AUL-001" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:13px; font-family:'IBM Plex Mono',monospace;">
+        </div>
+        <div>
+          <label style="font-size:11.5px; color:var(--text-soft); display:block; margin-bottom:4px;">HPP per pcs</label>
+          <input type="number" id="newProdukHpp" placeholder="90000" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+        </div>
+        <button class="btn btn-ghost" style="color:var(--navy); border-color:var(--border); white-space:nowrap;" onclick="addProductSeriesRow()">+ Tambah</button>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveProductSeriesSettings()">💾 Simpan Semua</button>
+      <button class="btn btn-ghost" style="color:var(--navy); border-color:var(--border);" onclick="document.getElementById('productSeriesExcelInput').click()">↑ Upload Excel</button>
+      <button class="btn btn-ghost" style="color:var(--navy); border-color:var(--border);" onclick="downloadProductSeriesTemplate()">📥 Download Template</button>
+      <input type="file" id="productSeriesExcelInput" accept=".xlsx,.xls" style="display:none;" onchange="handleProductSeriesExcelUpload(event)">
       <span id="hppSaveStatus" style="font-size:12px; color:var(--text-soft); margin-left:10px;"></span>
+      <p style="font-size:11.5px; color:var(--text-soft); margin-top:10px;">Format Excel: 3 kolom dengan header "Nama Produk/Series", "SKU/Kata Kunci", dan "HPP" (urutan kolom bebas, sistem baca dari nama headernya).</p>
     </div>
 
     <div class="panel cut-corner" id="excludedOrdersPanel" style="display:none; margin-bottom:20px;">
       <h3>Pesanan Dikecualikan dari Laporan Keuangan</h3>
       <div class="accent-cut"></div>
+
 
       <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Kata Sandi FO (Fake Order)</label>
       <p style="font-size:12px; color:var(--text-soft); margin-bottom:10px;">
@@ -653,7 +706,8 @@
         <div class="daterange-content" id="keuanganRangeContent"></div>
       </div>
     </div>
-    <button class="btn btn-ghost no-print" style="margin:0 0 20px; color:var(--navy); border-color:var(--border);" onclick="downloadKeuanganPDF()">📄 Download PDF</button>
+    <button class="btn btn-ghost no-print" style="margin:0 8px 20px 0; color:var(--navy); border-color:var(--border);" onclick="downloadKeuanganPDF()">📄 Download PDF</button>
+    <button class="btn btn-ghost no-print" style="margin:0 0 20px; color:var(--navy); border-color:var(--border);" onclick="printKeuanganReport()">🖨️ Print</button>
 
     <div class="print-header" id="printHeader" style="display:none;">
       <div class="print-header-logo">Sellvix AI</div>
@@ -675,6 +729,13 @@
 
       <div class="kpi-grid-4" id="keuanganKpiGrid"></div>
       <p style="font-size:11.5px; color:var(--text-soft); margin:-14px 0 20px;">ℹ️ Komisi Affiliate, Admin Shopee, dan Selisih Ongkir Kirim di atas cuma rincian transparansi — sudah otomatis termasuk di "Penghasilan Bersih", bukan potongan tambahan di luar itu. <strong>Pesanan Sedang Dikirim</strong> masih harga kotor (belum kepotong biaya apapun, karena order-nya belum final) — dipakai buat hitung "Omzet Kotor" & "Penghasilan Kotor" sebagai gambaran potensi, bukan angka final. <strong>Dana Pending</strong> beda lagi — itu order yang sudah <em>Selesai</em> tapi uangnya belum dirilis Shopee sampai sekarang, jadi <strong>tidak</strong> ikut dihitung di Laba Bersih (nanti jadi omzet di laporan periode berikutnya begitu dirilis).</p>
+
+      <div class="panel cut-corner" id="keuanganAutoInsightsPanel" style="margin-bottom:20px; display:none;">
+        <h3>📊 Analisa Otomatis</h3>
+        <div class="accent-cut"></div>
+        <div id="keuanganAutoInsightsBody" style="display:flex; flex-direction:column; gap:10px;"></div>
+        <p style="font-size:11px; color:var(--text-soft); margin-top:12px;">Dihitung otomatis dari angka yang ada — bukan dari AI, murni perbandingan data.</p>
+      </div>
 
       <div class="panel cut-corner">
         <h3>Laba per Series</h3>
@@ -763,35 +824,23 @@
     <div class="panel cut-corner">
       <h3>3. Cara Menyimpan Laporan Aplikasi (Download PDF)</h3>
       <div class="accent-cut"></div>
-      <p style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">Laporan Keuangan bisa disimpan jadi file PDF — bisa dikirim ke investor, mitra, atau akuntan tanpa perlu kasih akses login ke aplikasi ini.</p>
+      <p style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">Laporan Keuangan bisa disimpan jadi file PDF — bisa dikirim ke investor, mitra, atau akuntan tanpa perlu kasih akses login ke aplikasi ini. Ada 2 tombol terpisah, tergantung kebutuhan.</p>
 
       <details class="faq-item">
-        <summary>💻 Laptop / PC</summary>
+        <summary>📄 Download PDF (langsung tersimpan)</summary>
         <ol>
           <li>Buka menu <strong>Laporan Keuangan</strong>, pilih periode yang mau disimpan</li>
           <li>Klik tombol <strong>"📄 Download PDF"</strong> di atas halaman</li>
-          <li>Muncul jendela <strong>Print</strong> — di bagian <strong>"Tujuan/Destination"</strong>, pilih <strong>"Simpan sebagai PDF" / "Save as PDF"</strong> (bukan nama printer fisik)</li>
-          <li>Klik <strong>Simpan/Save</strong>, pilih folder tujuan di komputer</li>
+          <li>Tunggu beberapa detik — file PDF <strong>langsung tersimpan otomatis</strong> ke folder Download HP/PC, tanpa jendela tambahan</li>
         </ol>
       </details>
 
       <details class="faq-item">
-        <summary>📱 Android</summary>
+        <summary>🖨️ Print (buat print fisik ke kertas)</summary>
         <ol>
-          <li>Buka menu <strong>Laporan Keuangan</strong>, pilih periode yang mau disimpan</li>
-          <li>Klik tombol <strong>"📄 Download PDF"</strong></li>
-          <li>Muncul preview print — ketuk ikon <strong>panah bawah / Download</strong>, atau di dropdown printer pilih <strong>"Save as PDF"</strong></li>
-          <li>File PDF otomatis masuk ke folder <strong>Download</strong> HP</li>
-        </ol>
-      </details>
-
-      <details class="faq-item">
-        <summary>📱 iPhone</summary>
-        <ol>
-          <li>Buka menu <strong>Laporan Keuangan</strong>, pilih periode yang mau disimpan</li>
-          <li>Klik tombol <strong>"📄 Download PDF"</strong></li>
-          <li>Di preview print Safari, cubit (pinch) layar preview ke arah dalam — ini bikin muncul opsi <strong>share</strong></li>
-          <li>Pilih <strong>"Simpan ke File(s)"</strong> buat nyimpen sebagai PDF ke aplikasi Files</li>
+          <li>Klik tombol <strong>"🖨️ Print"</strong> di sebelah tombol Download PDF</li>
+          <li>Muncul jendela Print bawaan browser — pilih printer fisik kamu di bagian "Tujuan/Destination", lalu klik Print</li>
+          <li>Kalau mau simpan sebagai PDF juga bisa lewat sini, pilih "Save as PDF" di Destination — tapi buat itu, tombol "📄 Download PDF" di atas lebih cepat (1 klik langsung)</li>
         </ol>
       </details>
 
@@ -932,6 +981,8 @@ function unlockDashboard(){
   document.getElementById("loginGate").style.display = "none";
   document.getElementById("app").style.display = "block";
   document.getElementById("tenantNameDisplay").textContent = currentTenantName || "";
+  loadProductSeriesSettings();
+  loadExcludedOrders();
   loadUploadHistory();
   refreshDashboard();
 }
@@ -964,38 +1015,52 @@ function initFirebase(){
 }
 
 /* ═══════════════════════════════════════════════════════
-   MAPPING SERIES — urutan pengecekan penting
+   MAPPING SERIES — dikonfigurasi manual oleh tiap toko (bukan hardcode lagi),
+   lewat menu "Setting Produk & HPP". Dicocokkan ke SKU dulu (kalau ada &
+   cocok persis), fallback ke kata kunci substring di Nama Produk.
 ═══════════════════════════════════════════════════════ */
-const SERIES_KEYWORDS = [
-  { keywords: ["Aulia"], code: "AULIA" },
-  { keywords: ["Santorini"], code: "SNTR" },
-  { keywords: ["Voile"], code: "VOILE" },
-  { keywords: ["Arami"], code: "ARM" },
-  { keywords: ["Travel", "Nadine"], code: "T-NDN" },
-  { keywords: ["Mukena Anak", "Anak"], code: "ANAK" },
-];
+let productSeriesList = []; // [{id, nama, kata_kunci, hpp, color}]
+let SERIES_LABEL = { UNKNOWN: "Tidak dikenali" };
+let SERIES_COLOR = { UNKNOWN: "#B0B8C4" };
 
-// Untuk judul produk yang TIDAK menyebut kata kunci series-nya sama sekali.
-// Tambahkan baris baru di sini kalau nanti ada judul lain yang muncul di log "tidak dikenali".
-// Dicek berdasarkan potongan judul yang unik (substring, tidak case-sensitive).
-const TITLE_OVERRIDES = [
-  { match: "Mukena Dewasa Terbaru 2026 Kekinian Mewah", code: "ARM" },
-  { match: "Mukena Dewasa Katun Foil Renda 2in1", code: "VOILE" },
-];
+const SERIES_COLOR_PALETTE = ["#0050FE","#3D7BFF","#0A1A3C","#7C93B8","#5C6B85","#E8B84B","#1A9C5F","#C24A4A","#8A5CD6","#D67B2C"];
 
-const SERIES_LABEL = { AULIA:"Aulia", SNTR:"Santorini", VOILE:"Voile", ARM:"Arami", "T-NDN":"Nadine", ANAK:"Mukena Anak", UNKNOWN:"Tidak dikenali" };
-const SERIES_COLOR = { AULIA:"#0050FE", SNTR:"#3D7BFF", VOILE:"#0A1A3C", ARM:"#7C93B8", "T-NDN":"#5C6B85", ANAK:"#E8B84B", UNKNOWN:"#B0B8C4" };
+function rebuildSeriesLookups(){
+  SERIES_LABEL = { UNKNOWN: "Tidak dikenali" };
+  SERIES_COLOR = { UNKNOWN: "#B0B8C4" };
+  hppSettings = {};
+  productSeriesList.forEach((s, idx) => {
+    SERIES_LABEL[s.id] = s.nama;
+    SERIES_COLOR[s.id] = s.color || SERIES_COLOR_PALETTE[idx % SERIES_COLOR_PALETTE.length];
+    hppSettings[s.id] = s.hpp || 0;
+  });
+}
+
+async function loadProductSeriesSettings(){
+  try{
+    const doc = await tenantCollection("settings").doc("product_series").get();
+    productSeriesList = (doc.exists && Array.isArray(doc.data().list)) ? doc.data().list : [];
+  }catch(e){ productSeriesList = []; }
+  rebuildSeriesLookups();
+}
+
+async function saveProductSeriesList(){
+  await tenantCollection("settings").doc("product_series").set({ list: productSeriesList });
+  rebuildSeriesLookups();
+}
 
 
-function detectSeries(namaProduk){
+
+function detectSeries(namaProduk, skuReferensi){
+  if(skuReferensi){
+    const skuLower = String(skuReferensi).toLowerCase().trim();
+    const bySku = productSeriesList.find(s => s.kata_kunci && skuLower === String(s.kata_kunci).toLowerCase().trim());
+    if(bySku) return bySku.id;
+  }
   if(!namaProduk) return "UNKNOWN";
   const lower = namaProduk.toLowerCase();
-  for(const {match, code} of TITLE_OVERRIDES){
-    if(lower.includes(match.toLowerCase())) return code;
-  }
-  for(const {keywords, code} of SERIES_KEYWORDS){
-    if(keywords.some(kw => lower.includes(kw.toLowerCase()))) return code;
-  }
+  const byKeyword = productSeriesList.find(s => s.kata_kunci && lower.includes(String(s.kata_kunci).toLowerCase().trim()));
+  if(byKeyword) return byKeyword.id;
   return "UNKNOWN";
 }
 
@@ -1047,11 +1112,13 @@ function parseWorkbook(arrayBuffer, sourceFile){
     const noPesanan = row["No. Pesanan"];
     if(!noPesanan) continue;
 
-    const series = detectSeries(row["Nama Produk"]);
+    const skuReferensi = row["Nomor Referensi SKU"] || row["SKU Induk"] || "";
+    const series = detectSeries(row["Nama Produk"], skuReferensi);
     if(series === "UNKNOWN") unknownLog.push({no_pesanan:noPesanan, nama_produk:row["Nama Produk"]});
 
     const item = {
       nama_produk: row["Nama Produk"] || "",
+      sku: skuReferensi,
       series,
       warna: row["Nama Variasi"] || "",
       jumlah: parseIntSafe(row["Jumlah"]),
@@ -1665,36 +1732,93 @@ async function refreshIklanDashboard(){
   renderIklanRoasChart(combined.summary.by_series);
   renderIklanAdsTable(combined.ads);
   await refreshOmzetContribution(combined, from, to);
-
-  lastIklanCombined = combined;
-  lastIklanPeriodeLabel = document.getElementById("iklanRangeLabel").textContent;
-  document.getElementById("aiInsightBox").style.display = "none"; // reset ringkasan lama tiap ganti periode
+  try { await renderAutoInsightsIklan(combined, from, to); } catch(e){ console.error("renderAutoInsightsIklan error:", e); }
 }
 
-let lastIklanCombined = null;
-let lastIklanPeriodeLabel = "";
+/* ═══════════════════════════════════════════════════════
+   ANALISA OTOMATIS — Data Iklan. Sama polanya kayak Data Penjualan:
+   bandingkan periode dipilih dengan periode SEBELUMNYA yang sepanjang sama.
+═══════════════════════════════════════════════════════ */
+async function renderAutoInsightsIklan(combined, from, to){
+  const panel = document.getElementById("iklanAutoInsightsPanel");
+  const body = document.getElementById("iklanAutoInsightsBody");
 
-async function generateAiInsight(){
-  if(!lastIklanCombined || lastIklanCombined.ads.length === 0) return;
-  const box = document.getElementById("aiInsightBox");
-  box.style.display = "block";
-  box.textContent = "⏳ Menganalisa data campaign...";
-
-  try{
-    const res = await fetch("/.netlify/functions/ai-insight", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        periodeLabel: lastIklanPeriodeLabel,
-        summary: lastIklanCombined.summary,
-        ads: lastIklanCombined.ads,
-      }),
-    });
-    const data = await res.json();
-    box.textContent = data.summary || `❌ Gagal: ${data.error || "unknown error"}`;
-  } catch(err){
-    box.textContent = `❌ Gagal memuat ringkasan AI: ${err.message}`;
+  if(currentRangeIklan === "all" || !from || !to){
+    panel.style.display = "none";
+    return;
   }
+
+  const fromDate = ymdToDate(from);
+  const toDate = ymdToDate(to);
+  const durasiHari = Math.round((toDate - fromDate) / 86400000) + 1;
+  const prevToDate = addDaysToDate(fromDate, -1);
+  const prevFromDate = addDaysToDate(prevToDate, -(durasiHari - 1));
+  const prevFrom = fmtLocalDate(prevFromDate);
+  const prevTo = fmtLocalDate(prevToDate);
+
+  let prevSummary = null;
+  try{
+    const snap = await tenantCollection("iklan_reports")
+      .where("periode_start", ">=", prevFrom)
+      .where("periode_start", "<=", prevTo)
+      .get();
+    let prevDocs = [];
+    snap.forEach(doc => { const d = doc.data(); if(d.periode_end <= prevTo) prevDocs.push(d); });
+    if(prevDocs.length > 0){
+      prevDocs = removeOverlappingSubsets(prevDocs);
+      prevSummary = combineIklanDocs(prevDocs).summary;
+    }
+  }catch(e){ prevSummary = null; }
+
+  const now = combined.summary;
+  const insights = [];
+  const rp = (n) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
+
+  if(prevSummary && prevSummary.total_biaya > 0){
+    const pct = (now.total_biaya - prevSummary.total_biaya) / prevSummary.total_biaya * 100;
+    insights.push({
+      icon: pct >= 0 ? "📈" : "📉", warn: pct > 30,
+      text: `Biaya Iklan ${pct>=0?"naik":"turun"} <strong>${Math.abs(pct).toFixed(1)}%</strong> dibanding periode sebelumnya (${rp(prevSummary.total_biaya)} → ${rp(now.total_biaya)})`,
+    });
+  } else if(now.total_biaya > 0){
+    insights.push({ icon:"📈", text: `Biaya Iklan periode ini ${rp(now.total_biaya)} — belum ada data periode sebelumnya (${prevFrom.slice(6,8)}/${prevFrom.slice(4,6)}-${prevTo.slice(6,8)}/${prevTo.slice(4,6)}) buat dibandingkan.` });
+  }
+
+  if(prevSummary && prevSummary.roas > 0){
+    const pct = (now.roas - prevSummary.roas) / prevSummary.roas * 100;
+    if(Math.abs(pct) >= 5){
+      insights.push({ icon: pct>=0?"✅":"⚠️", warn: pct < -15, text: `ROAS ${pct>=0?"naik":"turun"} dari <strong>${prevSummary.roas.toFixed(2)}x</strong> jadi <strong>${now.roas.toFixed(2)}x</strong>` });
+    }
+  }
+
+  if(now.roas > 0 && now.roas < 1){
+    insights.push({ icon:"⚠️", warn:true, text: `ROAS di bawah 1x (<strong>${now.roas.toFixed(2)}x</strong>) — biaya iklan lebih besar dari omzet yang dihasilkan.` });
+  }
+
+  const seriesEntries = Object.entries(now.by_series || {}).map(([code,v]) => ({ code, ...v, roas: v.biaya ? v.omzet/v.biaya : 0 }));
+  if(seriesEntries.length > 1){
+    const sortedBySpend = [...seriesEntries].sort((a,b)=>b.biaya-a.biaya);
+    const topSpender = sortedBySpend[0];
+    if(topSpender.biaya > 0 && topSpender.roas < 1){
+      insights.push({ icon:"⚠️", warn:true, text: `Series <strong>${SERIES_LABEL[topSpender.code]||topSpender.code}</strong> paling banyak biaya iklan (${rp(topSpender.biaya)}), tapi ROAS cuma <strong>${topSpender.roas.toFixed(2)}x</strong> — worth dicek lagi.` });
+    }
+    const withRoas = seriesEntries.filter(s=>s.biaya>0).sort((a,b)=>b.roas-a.roas);
+    if(withRoas.length > 0){
+      const best = withRoas[0];
+      insights.push({ icon:"⭐", text: `Series paling efisien: <strong>${SERIES_LABEL[best.code]||best.code}</strong> — ROAS <strong>${best.roas.toFixed(2)}x</strong>` });
+    }
+  }
+
+  if(insights.length === 0){
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "block";
+  body.innerHTML = insights.map(ins => `
+    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:8px; background:${ins.warn?'var(--danger-pale)':'var(--surface-2)'};">
+      <span style="font-size:16px;">${ins.icon}</span>
+      <span style="font-size:13px; line-height:1.5; color:${ins.warn?'var(--danger)':'var(--text)'};">${ins.text}</span>
+    </div>`).join("");
 }
 
 /* ── Fitur: Kontribusi Iklan vs Penjualan Organik ──
@@ -1970,42 +2094,124 @@ async function initIklanPage(){
                       - alokasi proporsional Biaya Shopee (dari laporan ini).
 ═══════════════════════════════════════════════════════ */
 
-let hppSettings = { AULIA:0, SNTR:0, VOILE:0, ARM:0, "T-NDN":0, ANAK:0 };
-
-async function loadHppSettings(){
-  try{
-    const doc = await tenantCollection("settings").doc("hpp_per_series").get();
-    if(doc.exists) hppSettings = { ...hppSettings, ...doc.data() };
-  }catch(e){ console.warn("Gagal load HPP settings:", e); }
-}
+let hppSettings = {}; // dibangun otomatis dari productSeriesList lewat rebuildSeriesLookups()
 
 function toggleHppSettings(){
   const panel = document.getElementById("hppSettingsPanel");
   const willShow = panel.style.display === "none";
   panel.style.display = willShow ? "block" : "none";
-  if(willShow) renderHppInputs();
+  if(willShow) renderProductSeriesTable();
 }
 
-function renderHppInputs(){
-  const grid = document.getElementById("hppInputGrid");
-  const codes = ["AULIA","SNTR","VOILE","ARM","T-NDN","ANAK"];
-  grid.innerHTML = codes.map(code => `
-    <div>
-      <label style="font-size:12px; color:var(--text-soft); font-weight:600; display:block; margin-bottom:4px;">${SERIES_LABEL[code]}</label>
-      <input type="number" id="hppInput_${code}" value="${hppSettings[code]||0}" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
-    </div>`).join("");
+function renderProductSeriesTable(){
+  const tbody = document.getElementById("productSeriesBody");
+  if(productSeriesList.length === 0){
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-soft);">Belum ada produk/series — tambahkan manual di bawah, atau upload Excel.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = productSeriesList.map((s, idx) => `
+    <tr>
+      <td><input type="text" value="${s.nama}" onchange="updateProductSeriesField(${idx},'nama',this.value)" style="width:100%; border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:13px;"></td>
+      <td><input type="text" value="${s.kata_kunci}" onchange="updateProductSeriesField(${idx},'kata_kunci',this.value)" style="width:100%; border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:13px; font-family:'IBM Plex Mono',monospace;"></td>
+      <td><input type="number" value="${s.hpp||0}" onchange="updateProductSeriesField(${idx},'hpp',parseFloat(this.value)||0)" style="width:100%; border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:13px;" class="mono"></td>
+      <td style="text-align:center;"><span style="cursor:pointer; color:var(--danger);" onclick="removeProductSeriesRow(${idx})">✕</span></td>
+    </tr>`).join("");
 }
 
-async function saveHppSettings(){
-  const codes = ["AULIA","SNTR","VOILE","ARM","T-NDN","ANAK"];
-  const newSettings = {};
-  codes.forEach(code => { newSettings[code] = parseFloat(document.getElementById(`hppInput_${code}`).value) || 0; });
-  hppSettings = newSettings;
-  await tenantCollection("settings").doc("hpp_per_series").set(hppSettings);
+function updateProductSeriesField(idx, field, value){
+  productSeriesList[idx][field] = value;
+}
+
+function removeProductSeriesRow(idx){
+  productSeriesList.splice(idx, 1);
+  renderProductSeriesTable();
+}
+
+function addProductSeriesRow(){
+  const nama = document.getElementById("newProdukNama").value.trim();
+  const kataKunci = document.getElementById("newProdukSku").value.trim();
+  const hpp = parseFloat(document.getElementById("newProdukHpp").value) || 0;
+  if(!nama || !kataKunci){ alert("Nama Produk/Series dan SKU/Kata Kunci wajib diisi."); return; }
+
+  productSeriesList.push({
+    id: `s${Date.now()}${Math.random().toString(36).slice(2,6)}`,
+    nama, kata_kunci: kataKunci, hpp,
+  });
+  document.getElementById("newProdukNama").value = "";
+  document.getElementById("newProdukSku").value = "";
+  document.getElementById("newProdukHpp").value = "";
+  renderProductSeriesTable();
+}
+
+async function saveProductSeriesSettings(){
+  await saveProductSeriesList();
   const statusEl = document.getElementById("hppSaveStatus");
-  statusEl.textContent = "✅ Tersimpan";
-  setTimeout(()=>{ statusEl.textContent = ""; }, 2500);
+  statusEl.textContent = `✅ Tersimpan (${productSeriesList.length} produk/series)`;
+  setTimeout(()=>{ statusEl.textContent = ""; }, 3000);
   await refreshKeuanganDashboard();
+}
+
+// Upload Excel massal: kolom fleksibel, dicari berdasarkan nama header
+// (Nama Produk/Series, SKU/Kata Kunci, HPP) — bukan posisi kolom tetap.
+function downloadProductSeriesTemplate(){
+  const data = [
+    ["Nama Produk/Series", "SKU/Kata Kunci", "HPP"],
+    ["Aulia", "aulia", 90000],
+    ["Santorini", "santorini", 98000],
+    ["Arami", "ARM-002", 83000],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = [{wch:22},{wch:20},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produk");
+  XLSX.writeFile(wb, "Template_Produk_HPP.xlsx");
+}
+
+async function handleProductSeriesExcelUpload(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("hppSaveStatus");
+  statusEl.textContent = `Membaca ${file.name}...`;
+
+  try{
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, {type:"array"});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
+
+    let headerIdx = -1, colNama = -1, colSku = -1, colHpp = -1;
+    for(let i=0;i<rows.length;i++){
+      const row = (rows[i]||[]).map(c => c ? String(c).toLowerCase() : "");
+      const iNama = row.findIndex(c => c.includes("nama") || c.includes("produk") || c.includes("series"));
+      const iSku = row.findIndex(c => c.includes("sku") || c.includes("kata kunci"));
+      const iHpp = row.findIndex(c => c.includes("hpp") || c.includes("modal"));
+      if(iNama !== -1 && iSku !== -1 && iHpp !== -1){
+        headerIdx = i; colNama = iNama; colSku = iSku; colHpp = iHpp;
+        break;
+      }
+    }
+    if(headerIdx === -1) throw new Error('Header tidak ditemukan. Pastikan ada kolom "Nama Produk/Series", "SKU/Kata Kunci", dan "HPP".');
+
+    let added = 0;
+    for(let i=headerIdx+1;i<rows.length;i++){
+      const row = rows[i];
+      if(!row || !row[colNama]) continue;
+      productSeriesList.push({
+        id: `s${Date.now()}${Math.random().toString(36).slice(2,6)}${i}`,
+        nama: String(row[colNama]).trim(),
+        kata_kunci: row[colSku] ? String(row[colSku]).trim() : "",
+        hpp: typeof row[colHpp]==="number" ? row[colHpp] : (parseFloat(row[colHpp])||0),
+      });
+      added++;
+    }
+
+    renderProductSeriesTable();
+    statusEl.textContent = `✅ ${added} produk/series ditambahkan dari ${file.name} — klik "Simpan" untuk konfirmasi.`;
+  } catch(err){
+    statusEl.textContent = `❌ Gagal: ${err.message}`;
+  } finally {
+    event.target.value = "";
+  }
 }
 
 /* ── Kelola pesanan yang dikecualikan dari Laporan Keuangan (misal fake/boost order) ── */
@@ -2622,6 +2828,107 @@ async function getPenjualanStatsForPeriod(from, to){
   };
 }
 
+// Hitung ringkasan Laba Bersih/Margin/dll utk periode manapun — dipakai buat
+// Analisa Otomatis (bandingin periode sekarang vs sebelumnya), independen dari
+// state currentRangeKeuangan supaya bisa dipanggil buat periode lain juga.
+async function computeKeuanganSnapshot(from, to){
+  const snap = await tenantCollection("income_reports")
+    .where("periode_start", ">=", from)
+    .where("periode_start", "<=", to)
+    .get();
+  let incomeDocs = [];
+  snap.forEach(doc => { const d = doc.data(); if(d.periode_end <= to) incomeDocs.push(d); });
+  if(incomeDocs.length === 0) return null;
+  incomeDocs = removeOverlappingSubsets(incomeDocs);
+
+  const ordersIncomeList = [];
+  incomeDocs.forEach(d => (d.orders_income||[]).forEach(o => ordersIncomeList.push(o)));
+  const profitResult = await computeSeriesProfitFromOrders(ordersIncomeList);
+  const adsData = await getAdsSpendForPeriod(from, to);
+  const penjualanStats = await getPenjualanStatsForPeriod(from, to);
+
+  const { bySeries, unmatchedTotal, matched, unmatched } = profitResult;
+  const totalPenghasilanBersih = Object.values(bySeries).reduce((s,v)=>s+v.penghasilan_bersih,0) + unmatchedTotal;
+  let totalHpp = 0;
+  Object.entries(bySeries).forEach(([code,val]) => { totalHpp += (hppSettings[code]||0) * val.qty; });
+  const totalBiayaIklan = adsData.totalBiaya || 0;
+  const labaBersih = totalPenghasilanBersih - totalHpp - totalBiayaIklan;
+  const omzetKotor = penjualanStats.selesaiValue + penjualanStats.sedangDikirimValue;
+  const totalOmzetSeries = Object.values(bySeries).reduce((s,v)=>s+v.omzet,0);
+  const margin = totalOmzetSeries ? (labaBersih/totalOmzetSeries*100) : 0;
+  const matchRate = (matched+unmatched) ? (matched/(matched+unmatched)*100) : 0;
+
+  return { labaBersih, margin, omzetKotor, totalBiayaIklan, totalHpp, totalPenghasilanBersih, matchRate };
+}
+
+async function renderAutoInsightsKeuangan(from, to){
+  const panel = document.getElementById("keuanganAutoInsightsPanel");
+  const body = document.getElementById("keuanganAutoInsightsBody");
+
+  if(currentRangeKeuangan === "all" || !from || !to){
+    panel.style.display = "none";
+    return;
+  }
+
+  const now = await computeKeuanganSnapshot(from, to);
+  if(!now){ panel.style.display = "none"; return; }
+
+  const fromDate = ymdToDate(from);
+  const toDate = ymdToDate(to);
+  const durasiHari = Math.round((toDate - fromDate) / 86400000) + 1;
+  const prevToDate = addDaysToDate(fromDate, -1);
+  const prevFromDate = addDaysToDate(prevToDate, -(durasiHari - 1));
+  const prevFrom = fmtLocalDate(prevFromDate);
+  const prevTo = fmtLocalDate(prevToDate);
+  const prev = await computeKeuanganSnapshot(prevFrom, prevTo);
+
+  const insights = [];
+  const rp = (n) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
+
+  if(prev && prev.labaBersih !== 0){
+    const pct = (now.labaBersih - prev.labaBersih) / Math.abs(prev.labaBersih) * 100;
+    insights.push({
+      icon: pct >= 0 ? "📈" : "📉", warn: pct < -15,
+      text: `Laba Bersih ${pct>=0?"naik":"turun"} <strong>${Math.abs(pct).toFixed(1)}%</strong> dibanding periode sebelumnya (${rp(prev.labaBersih)} → ${rp(now.labaBersih)})`,
+    });
+  } else if(!prev){
+    insights.push({ icon:"📈", text: `Laba Bersih periode ini ${rp(now.labaBersih)} — belum ada data periode sebelumnya (${prevFrom.slice(6,8)}/${prevFrom.slice(4,6)}-${prevTo.slice(6,8)}/${prevTo.slice(4,6)}) buat dibandingkan.` });
+  }
+
+  if(prev){
+    const marginDiff = now.margin - prev.margin;
+    if(Math.abs(marginDiff) >= 2){
+      insights.push({ icon: marginDiff>=0?"✅":"⚠️", warn: marginDiff < -3, text: `Margin ${marginDiff>=0?"naik":"turun"} dari ${prev.margin.toFixed(1)}% jadi <strong>${now.margin.toFixed(1)}%</strong>` });
+    }
+  }
+
+  if(now.labaBersih < 0){
+    insights.push({ icon:"⚠️", warn:true, text: `Laba Bersih periode ini <strong>minus</strong> (${rp(now.labaBersih)}) — biaya lebih besar dari penghasilan.` });
+  }
+
+  if(now.omzetKotor > 0){
+    const pctIklan = now.totalBiayaIklan / now.omzetKotor * 100;
+    if(pctIklan > 15){
+      insights.push({ icon:"⚠️", warn: pctIklan > 25, text: `Biaya Iklan menyerap <strong>${pctIklan.toFixed(1)}%</strong> dari Omzet Kotor — cukup besar, worth dievaluasi efisiensinya.` });
+    }
+  }
+
+  if(now.matchRate > 0 && now.matchRate < 80){
+    insights.push({ icon:"ℹ️", text: `Order Tercocokkan cuma <strong>${now.matchRate.toFixed(1)}%</strong> — sebagian data mungkin belum lengkap (Data Penjualan periode terkait perlu di-upload).` });
+  }
+
+  if(insights.length === 0){
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "block";
+  body.innerHTML = insights.map(ins => `
+    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:8px; background:${ins.warn?'var(--danger-pale)':'var(--surface-2)'};">
+      <span style="font-size:16px;">${ins.icon}</span>
+      <span style="font-size:13px; line-height:1.5; color:${ins.warn?'var(--danger)':'var(--text)'};">${ins.text}</span>
+    </div>`).join("");
+}
+
 async function refreshKeuanganDashboard(){
   if(currentRangeKeuangan !== "all" && (!keuanganRangeFrom || !keuanganRangeTo)){
     const today = fmtLocalDate(new Date());
@@ -2677,6 +2984,7 @@ async function refreshKeuanganDashboard(){
 
   renderKeuanganKPI(incomeSummary, profitResult, adsBySeriesData, danaPending, penjualanStats, saldoData);
   renderKeuanganSeriesTable(profitResult, adsBySeriesData);
+  try { await renderAutoInsightsKeuangan(from, to); } catch(e){ console.error("renderAutoInsightsKeuangan error:", e); }
 }
 
 /* ── Pencocokan presisi: tiap order di laporan penghasilan dicocokkan ke
@@ -2859,15 +3167,45 @@ function renderKeuanganSeriesTable(profitResult, adsData){
   document.getElementById("keuanganSeriesBody").innerHTML = html || `<tr><td colspan="9" style="text-align:center; color:var(--text-soft);">Belum ada data</td></tr>`;
 }
 
-function downloadKeuanganPDF(){
+function printKeuanganReport(){
   const periodeLabel = document.getElementById("keuanganRangeLabel").textContent;
   document.getElementById("printHeaderPeriode").textContent = `Periode: ${periodeLabel}`;
   document.getElementById("printHeaderDate").textContent = `Dibuat pada ${new Date().toLocaleString("id-ID")}`;
   window.print();
 }
 
+async function downloadKeuanganPDF(){
+  const periodeLabel = document.getElementById("keuanganRangeLabel").textContent;
+  document.getElementById("printHeaderPeriode").textContent = `Periode: ${periodeLabel}`;
+  document.getElementById("printHeaderDate").textContent = `Dibuat pada ${new Date().toLocaleString("id-ID")}`;
+
+  const btn = document.querySelector('[onclick="downloadKeuanganPDF()"]');
+  const originalText = btn ? btn.textContent : "";
+  if(btn) btn.textContent = "⏳ Membuat PDF...";
+
+  document.body.classList.add("force-print");
+  try{
+    const element = document.getElementById("page-keuangan");
+    const safeName = periodeLabel.replace(/[^a-zA-Z0-9]+/g, "_");
+    await html2pdf().set({
+      margin: 8,
+      filename: `Laporan_Keuangan_${safeName}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["css", "legacy"] },
+    }).from(element).save();
+  } catch(err){
+    console.error(err);
+    alert(`Gagal membuat PDF: ${err.message}`);
+  } finally {
+    document.body.classList.remove("force-print");
+    if(btn) btn.textContent = originalText;
+  }
+}
+
 async function initKeuanganPage(){
-  await loadHppSettings();
+  await loadProductSeriesSettings();
   await loadExcludedOrders();
   await refreshKeuanganDashboard();
 }
@@ -3080,6 +3418,124 @@ async function refreshDashboard(){
   try { renderSeriesChart(days); } catch(e){ console.error("renderSeriesChart error:", e); }
   try { renderTopProducts(days); } catch(e){ console.error("renderTopProducts error:", e); }
   try { renderTopCities(days); } catch(e){ console.error("renderTopCities error:", e); }
+  try { await renderAutoInsights(days, from, to); } catch(e){ console.error("renderAutoInsights error:", e); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   ANALISA OTOMATIS — murni perbandingan angka (bukan AI).
+   Bandingkan periode yang dipilih dengan periode SEBELUMNYA
+   yang panjangnya sama persis, plus cari hari terbaik & series terlaris.
+═══════════════════════════════════════════════════════ */
+async function renderAutoInsights(days, from, to){
+  const panel = document.getElementById("autoInsightsPanel");
+  const body = document.getElementById("autoInsightsBody");
+
+  if(currentRangePenjualan === "all" || !from || !to || from === "00000000"){
+    panel.style.display = "none";
+    return;
+  }
+
+  const fromDate = ymdToDate(from);
+  const toDate = ymdToDate(to);
+  const durasiHari = Math.round((toDate - fromDate) / 86400000) + 1;
+  const prevToDate = addDaysToDate(fromDate, -1);
+  const prevFromDate = addDaysToDate(prevToDate, -(durasiHari - 1));
+  const prevFrom = fmtLocalDate(prevFromDate);
+  const prevTo = fmtLocalDate(prevToDate);
+
+  let prevDays = [];
+  try{
+    const snap = await tenantCollection("daily_summary")
+      .where(firebase.firestore.FieldPath.documentId(), ">=", prevFrom)
+      .where(firebase.firestore.FieldPath.documentId(), "<=", prevTo)
+      .get();
+    snap.forEach(doc => prevDays.push(doc.data()));
+  }catch(e){ prevDays = []; }
+
+  const sum = (arr, field) => arr.reduce((s,d)=>s+(d[field]||0), 0);
+  const gmvNow = sum(days, "gmv"), gmvPrev = sum(prevDays, "gmv");
+  const orderNow = sum(days, "total_order"), orderPrev = sum(prevDays, "total_order");
+  const batalNow = sum(days, "order_batal"), batalPrev = sum(prevDays, "order_batal");
+  const selesaiNow = sum(days, "order_selesai"), selesaiPrev = sum(prevDays, "order_selesai");
+  const cancelRateNow = orderNow ? (batalNow/orderNow*100) : 0;
+  const cancelRatePrev = orderPrev ? (batalPrev/orderPrev*100) : 0;
+  const aovNow = selesaiNow ? gmvNow/selesaiNow : 0;
+  const aovPrev = selesaiPrev ? gmvPrev/selesaiPrev : 0;
+
+  const insights = [];
+  const rp = (n) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
+
+  // 1. GMV vs periode sebelumnya
+  if(gmvPrev > 0){
+    const pct = (gmvNow-gmvPrev)/gmvPrev*100;
+    insights.push({
+      icon: pct >= 0 ? "📈" : "📉", warn: pct < -10,
+      text: `GMV ${pct>=0?"naik":"turun"} <strong>${Math.abs(pct).toFixed(1)}%</strong> dibanding periode sebelumnya (${rp(gmvPrev)} → ${rp(gmvNow)})`,
+    });
+  } else if(gmvNow > 0){
+    insights.push({ icon:"📈", text: `GMV periode ini ${rp(gmvNow)} — belum ada data periode sebelumnya (${prevFrom.slice(6,8)}/${prevFrom.slice(4,6)}-${prevTo.slice(6,8)}/${prevTo.slice(4,6)}) buat dibandingkan.` });
+  }
+
+  // 2. Cancel rate
+  if(cancelRateNow > 15){
+    insights.push({ icon:"⚠️", warn:true, text: `Cancel rate cukup tinggi: <strong>${cancelRateNow.toFixed(1)}%</strong> — ada baiknya cek alasan pembatalan.` });
+  } else if(prevDays.length > 0 && Math.abs(cancelRateNow-cancelRatePrev) >= 3){
+    const naik = cancelRateNow > cancelRatePrev;
+    insights.push({ icon: naik?"⚠️":"✅", warn:naik, text: `Cancel rate ${naik?"naik":"turun"} dari ${cancelRatePrev.toFixed(1)}% jadi <strong>${cancelRateNow.toFixed(1)}%</strong>` });
+  }
+
+  // 3. Hari terbaik (kalau lebih dari 1 hari dalam periode)
+  if(days.length > 1){
+    const sorted = [...days].sort((a,b)=>b.gmv-a.gmv);
+    if(sorted[0].gmv > 0){
+      const d = ymdToDate(sorted[0].tanggal);
+      insights.push({ icon:"🏆", text: `Hari terbaik: <strong>${fmtDM(d)}</strong> dengan GMV ${rp(sorted[0].gmv)}` });
+    }
+  }
+
+  // 4. Series terlaris
+  const bySeriesAgg = {};
+  days.forEach(d => {
+    Object.entries(d.by_series||{}).forEach(([code,val]) => {
+      if(!bySeriesAgg[code]) bySeriesAgg[code] = {qty:0, revenue:0};
+      bySeriesAgg[code].qty += val.qty;
+      bySeriesAgg[code].revenue += val.revenue;
+    });
+  });
+  const seriesSorted = Object.entries(bySeriesAgg).sort((a,b)=>b[1].revenue-a[1].revenue);
+  if(seriesSorted.length > 0 && seriesSorted[0][1].revenue > 0){
+    const [code, val] = seriesSorted[0];
+    const pctOfTotal = gmvNow ? (val.revenue/gmvNow*100) : 0;
+    insights.push({ icon:"⭐", text: `Series terlaris: <strong>${SERIES_LABEL[code]||code}</strong> — ${rp(val.revenue)} (${pctOfTotal.toFixed(0)}% dari total omzet)` });
+  }
+  // Series dengan qty > 0 tapi paling kecil kontribusinya (kandidat kurang laku)
+  if(seriesSorted.length > 1){
+    const [code, val] = seriesSorted[seriesSorted.length-1];
+    const pctOfTotal = gmvNow ? (val.revenue/gmvNow*100) : 0;
+    if(pctOfTotal < 5){
+      insights.push({ icon:"📉", text: `Series paling sedikit kontribusinya: <strong>${SERIES_LABEL[code]||code}</strong> — cuma ${pctOfTotal.toFixed(1)}% dari total omzet` });
+    }
+  }
+
+  // 5. AOV
+  if(aovPrev > 0){
+    const pct = (aovNow-aovPrev)/aovPrev*100;
+    if(Math.abs(pct) >= 5){
+      insights.push({ icon: pct>=0?"💰":"📉", warn: pct<-10, text: `Rata-rata nilai order (AOV) ${pct>=0?"naik":"turun"} <strong>${Math.abs(pct).toFixed(1)}%</strong> (${rp(aovPrev)} → ${rp(aovNow)})` });
+    }
+  }
+
+  if(insights.length === 0){
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "block";
+  body.innerHTML = insights.map(ins => `
+    <div style="display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:8px; background:${ins.warn?'var(--danger-pale)':'var(--surface-2)'};">
+      <span style="font-size:16px;">${ins.icon}</span>
+      <span style="font-size:13px; line-height:1.5; color:${ins.warn?'var(--danger)':'var(--text)'};">${ins.text}</span>
+    </div>`).join("");
 }
 
 function renderEmptyState(){
@@ -3280,7 +3736,7 @@ const CHATBOT_CATEGORIES = [
       },
       {
         q: "Bagaimana cara download laporan jadi PDF?",
-        a: "Klik tombol \"📄 Download PDF\" di Laporan Keuangan. Muncul jendela Print — pilih \"Simpan sebagai PDF\" di bagian Tujuan/Destination, lalu Save."
+        a: "Klik tombol \"📄 Download PDF\" di Laporan Keuangan — file PDF langsung tersimpan otomatis ke folder Download, tanpa dialog print. Kalau mau print fisik ke kertas, ada tombol terpisah \"🖨️ Print\"."
       },
     ]
   },
