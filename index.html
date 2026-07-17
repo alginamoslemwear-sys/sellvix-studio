@@ -812,17 +812,29 @@
       <h3>2. Cara Upload File Excel ke Aplikasi</h3>
       <div class="accent-cut"></div>
       <ol>
-        <li>Buka menu yang sesuai jenis file (<strong>Data Penjualan</strong>, <strong>Data Iklan</strong>, atau <strong>Laporan Keuangan</strong>)</li>
-        <li>Klik tombol biru <strong>"↑ Upload..."</strong> di bagian atas halaman</li>
-        <li>Pilih file Excel/CSV yang sudah di-download dari Shopee (dari folder Download HP/PC kamu)</li>
-        <li>Tunggu beberapa detik — muncul pesan <strong>"✅ berhasil disinkron"</strong> kalau sukses</li>
-        <li>Dashboard otomatis update sesuai data yang baru di-upload</li>
+        <li>Buka menu <strong>Upload Pusat</strong> (tab pertama di navigasi atas)</li>
+        <li>Klik kotak <strong>"Klik untuk pilih file, atau seret & lepas di sini"</strong>, atau langsung drag file dari folder Download HP/PC kamu ke kotak itu</li>
+        <li>Bisa pilih <strong>banyak file sekaligus</strong> — Order All, Laporan Iklan, Laporan Penghasilan, Laporan Saldo, semua boleh diupload bareng</li>
+        <li>Sistem otomatis mendeteksi jenis tiap file dari isinya, lalu memprosesnya masing-masing</li>
+        <li>Progress & hasil tiap file muncul langsung, tersimpan juga di tabel <strong>Riwayat Upload</strong> di bawahnya</li>
       </ol>
       <p class="faq-note">Nama file bebas — aplikasi baca dari <strong>isi data</strong>, bukan nama file. Upload ulang file yang sama juga aman, tidak bikin data dobel (sistem otomatis menimpa data lama).</p>
     </div>
 
     <div class="panel cut-corner">
-      <h3>3. Cara Menyimpan Laporan Aplikasi (Download PDF)</h3>
+      <h3>3. Cara Setting Produk & HPP (wajib sebelum upload pertama kali)</h3>
+      <div class="accent-cut"></div>
+      <ol>
+        <li>Buka menu <strong>Laporan Keuangan</strong>, klik tombol <strong>"⚙️ Setting Produk & HPP per Series"</strong></li>
+        <li>Isi tabel: <strong>Nama Produk/Series</strong> (misal "Aulia"), <strong>SKU/Kata Kunci</strong> (kode SKU asli dari Shopee, atau kata yang muncul di nama produk), dan <strong>HPP per pcs</strong> (modal produksi)</li>
+        <li>Bisa tambah manual satu-satu, atau klik <strong>"📥 Download Template"</strong> buat dapat file Excel siap isi, lalu upload lewat <strong>"↑ Upload Excel"</strong> buat isi banyak sekaligus</li>
+        <li>Klik <strong>"💾 Simpan Semua"</strong></li>
+      </ol>
+      <p class="faq-note">Ini wajib diisi <strong>sebelum</strong> upload Data Penjualan pertama kali — kalau belum ada daftar produknya, semua item bakal masuk kategori "Tidak Dikenali".</p>
+    </div>
+
+    <div class="panel cut-corner">
+      <h3>4. Cara Menyimpan Laporan Aplikasi (Download PDF)</h3>
       <div class="accent-cut"></div>
       <p style="font-size:13px; color:var(--text-soft); margin-bottom:14px;">Laporan Keuangan bisa disimpan jadi file PDF — bisa dikirim ke investor, mitra, atau akuntan tanpa perlu kasih akses login ke aplikasi ini. Ada 2 tombol terpisah, tergantung kebutuhan.</p>
 
@@ -845,6 +857,18 @@
       </details>
 
       <p class="faq-note">PDF yang dihasilkan otomatis cuma berisi ringkasan KPI & tabel laba per series — tombol, menu navigasi, dan pengaturan nggak ikut kebawa, jadi hasilnya rapi buat dibagikan.</p>
+    </div>
+
+    <div class="panel cut-corner">
+      <h3>5. Cara Daftar & Masuk ke Aplikasi</h3>
+      <div class="accent-cut"></div>
+      <ol>
+        <li>Buka halaman login — kalau belum punya akun, klik <strong>"Daftar di sini"</strong></li>
+        <li>Isi <strong>Nama Toko</strong>, Email, dan Password, klik <strong>Daftar</strong></li>
+        <li>Kalau sudah punya akun, isi Email & Password lalu klik <strong>Masuk</strong> — atau klik <strong>"Masuk dengan Google"</strong> buat login lebih cepat pakai akun Google</li>
+        <li>Tiap akun (toko) datanya <strong>terpisah otomatis</strong> dari akun lain — nggak akan tercampur</li>
+      </ol>
+      <p class="faq-note">Lupa password? Untuk saat ini, hubungi Chat Admin (ikon 💬 di pojok kanan bawah) buat bantuan reset akun.</p>
     </div>
 
   </div><!-- /#page-faq -->
@@ -3686,7 +3710,7 @@ const CHATBOT_CATEGORIES = [
     questions: [
       {
         q: "Bagaimana cara upload Data Penjualan?",
-        a: "Buka menu Data Penjualan, klik tombol \"↑ Upload Excel Harian\", pilih file Order All yang sudah di-download dari Shopee (Pesanan Saya → Export). Sistem otomatis baca isi filenya, nggak peduli nama filenya apa."
+        a: "Buka menu <strong>Upload Pusat</strong> (tab pertama), drag & drop atau pilih file Order All yang sudah di-download dari Shopee (Pesanan Saya → Export). Sistem otomatis deteksi jenis filenya dan proses ke tempat yang benar."
       },
       {
         q: "Kenapa GMV saya lebih kecil dari yang saya kira?",
@@ -3698,7 +3722,11 @@ const CHATBOT_CATEGORIES = [
       },
       {
         q: "Bagaimana FO (Fake Order) terdeteksi?",
-        a: "Aplikasi mendeteksi lewat kata sandi yang kamu atur sendiri di kolom Catatan Penjual pada file Excel (setting ada di \"🚫 Kelola Pesanan Dikecualikan\", Laporan Keuangan). Order dengan kata itu otomatis dikecualikan dari GMV dan semua KPI, tapi tetap tersimpan di database."
+        a: "Aplikasi mendeteksi lewat kata sandi yang kamu atur sendiri di kolom Catatan Penjual pada file Excel (setting ada di \"🚫 Kelola Pesanan Dikecualikan\", Laporan Keuangan). Order dengan kata itu otomatis dikecualikan dari GMV dan semua KPI (Data Penjualan maupun Laporan Keuangan), tapi tetap tersimpan di database."
+      },
+      {
+        q: "Apa itu panel \"Analisa Otomatis\"?",
+        a: "Ringkasan otomatis yang membandingkan periode yang dipilih dengan periode sebelumnya (GMV naik/turun, cancel rate, hari terbaik, series terlaris, dll). Semuanya dihitung murni dari perbandingan angka — <strong>bukan dari AI</strong>."
       },
     ]
   },
@@ -3707,7 +3735,7 @@ const CHATBOT_CATEGORIES = [
     questions: [
       {
         q: "Bagaimana cara upload Data Iklan?",
-        a: "Buka menu Data Iklan, klik \"↑ Upload Laporan Iklan\", pilih file CSV \"Semua Laporan Iklan CPC\" dari Shopee Ads Center. Periode file bebas — harian, mingguan, atau bulanan."
+        a: "Buka menu <strong>Upload Pusat</strong>, drag & drop atau pilih file CSV \"Semua Laporan Iklan CPC\" dari Shopee Ads Center. Periode file bebas — harian, mingguan, atau bulanan. Sistem otomatis kenali ini file Data Iklan dari isinya."
       },
       {
         q: "Kenapa Biaya Iklan tidak muncul di Laporan Keuangan?",
@@ -3716,6 +3744,10 @@ const CHATBOT_CATEGORIES = [
       {
         q: "Bagaimana cara lihat performa iklan per minggu/bulan tertentu?",
         a: "Klik tombol \"Pilih Periode\" di Data Iklan, pilih kategori Minggu/Bulan/Kuartal, lalu pilih rentang yang diinginkan. Sistem otomatis gabungkan laporan yang relevan dan hindari dobel-hitung kalau ada yang tumpang tindih."
+      },
+      {
+        q: "Apa itu panel \"Analisa Otomatis\" di Data Iklan?",
+        a: "Ringkasan otomatis yang membandingkan Biaya Iklan & ROAS dengan periode sebelumnya, plus nunjukin series mana yang paling boros tapi ROAS-nya jelek, dan series paling efisien. Murni perbandingan angka, <strong>bukan dari AI</strong>."
       },
     ]
   },
@@ -3732,11 +3764,15 @@ const CHATBOT_CATEGORIES = [
       },
       {
         q: "Apa itu HPP dan bagaimana cara mengaturnya?",
-        a: "HPP (modal produksi per pcs) diisi manual di tombol \"⚙️ Setting HPP per Series\" di Laporan Keuangan — cukup sekali, ubah lagi kalau modal produksi berubah. Dipakai buat hitung Laba Bersih per series."
+        a: "HPP (modal produksi per pcs) diatur di \"⚙️ Setting Produk & HPP per Series\" (Laporan Keuangan). Di situ kamu daftarkan produk sendiri: Nama Produk/Series, SKU/Kata Kunci (buat pencocokan otomatis), dan HPP-nya — bisa manual atau upload Excel massal. Dipakai buat hitung Laba Bersih per series."
       },
       {
         q: "Bagaimana cara download laporan jadi PDF?",
         a: "Klik tombol \"📄 Download PDF\" di Laporan Keuangan — file PDF langsung tersimpan otomatis ke folder Download, tanpa dialog print. Kalau mau print fisik ke kertas, ada tombol terpisah \"🖨️ Print\"."
+      },
+      {
+        q: "Apa itu panel \"Analisa Otomatis\" di Laporan Keuangan?",
+        a: "Ringkasan otomatis yang membandingkan Laba Bersih & Margin dengan periode sebelumnya, plus peringatan kalau Laba Bersih minus atau Biaya Iklan menyerap porsi terlalu besar dari Omzet. Murni perbandingan angka, <strong>bukan dari AI</strong>."
       },
     ]
   },
@@ -3749,11 +3785,15 @@ const CHATBOT_CATEGORIES = [
       },
       {
         q: "File apa saja yang wajib di-upload tiap bulan?",
-        a: "3 file wajib: Order All (Data Penjualan), Laporan Iklan CPC (Data Iklan), dan Laporan Penghasilan (Laporan Keuangan). Laporan Saldo sifatnya opsional, cuma buat kartu \"Dana Ditarik ke Bank\"."
+        a: "3 file wajib: Order All (Data Penjualan), Laporan Iklan CPC (Data Iklan), dan Laporan Penghasilan (Laporan Keuangan). Laporan Saldo sifatnya opsional, cuma buat kartu \"Dana Ditarik ke Bank\". Semuanya diupload dari 1 tempat: menu <strong>Upload Pusat</strong>."
       },
       {
         q: "Upload ulang file yang sama, apakah datanya jadi dobel?",
         a: "Tidak. Sistem selalu menghitung ulang dari isi file yang diupload dan menimpa data lama untuk tanggal yang sama — aman diupload ulang kapan saja."
+      },
+      {
+        q: "Bagaimana cara daftar akun baru?",
+        a: "Di halaman login, klik \"Daftar di sini\", isi Nama Toko, Email, dan Password. Bisa juga langsung pakai \"Masuk dengan Google\" buat login lebih cepat. Tiap akun datanya otomatis terpisah dari akun lain."
       },
     ]
   },
