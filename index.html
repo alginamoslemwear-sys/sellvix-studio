@@ -401,7 +401,7 @@
   <div class="login-card cut-corner">
     <img class="login-logo" src="logo-wordmark.png" alt="Sellvix Studio">
     <div class="accent-cut"></div>
-    <h1>Sellvix AI</h1>
+    <h1>Shopee Dashboard Manager</h1>
     <div class="sub" id="authModeSub">Masuk ke akun toko kamu</div>
 
     <div id="authError" style="color:#ff8080; font-size:12.5px; margin:8px 0; display:none;"></div>
@@ -438,7 +438,7 @@
       <div class="brand-row">
         <img class="header-logo" src="logo-wordmark.png" alt="Sellvix Studio">
       </div>
-      <h1>Data Penjualan</h1>
+      <h1>Shopee Dashboard Manager</h1>
       <div class="sub" id="lastSync">Belum ada data — silakan upload file Excel pertama.</div>
     </div>
   </div>
@@ -2229,7 +2229,7 @@ async function saveProductSeriesSettings(){
 
   try{
     const result = await reclassifyAllOrders();
-    noteEl.textContent = `✅ Selesai — ${result.changedCount} order dihitung ulang, ${result.affectedDatesCount} hari diperbarui. Semua dashboard sudah otomatis update, tidak perlu upload ulang.`;
+    noteEl.textContent = `✅ Selesai — ${result.changedCount} order & ${result.adsChangedCount} campaign iklan dihitung ulang (${result.affectedDatesCount} hari diperbarui). Semua dashboard sudah otomatis update, tidak perlu upload ulang.`;
   } catch(err){
     console.error(err);
     noteEl.style.color = "#C22945";
@@ -2288,7 +2288,41 @@ async function reclassifyAllOrders(){
     await tenantCollection("daily_summary").doc(tgl).set(summary);
   }
 
-  return { changedCount, affectedDatesCount: affectedDates.length };
+  // Reklasifikasi Data Iklan juga — campaign iklan dicocokkan dari nama campaign-nya,
+  // yang tersimpan per laporan (iklan_reports), independen dari data order.
+  const adsChangedCount = await reclassifyAllAds();
+
+  return { changedCount, affectedDatesCount: affectedDates.length, adsChangedCount };
+}
+
+// Hitung ulang klasifikasi series buat SEMUA campaign iklan yang sudah tersimpan,
+// pakai daftar produk/kata kunci TERBARU — tanpa perlu upload ulang CSV-nya lagi.
+async function reclassifyAllAds(){
+  const snap = await tenantCollection("iklan_reports").get();
+  let changedCount = 0;
+  let batch = db.batch();
+  let opCount = 0;
+
+  for(const doc of snap.docs){
+    const report = doc.data();
+    let reportChanged = false;
+    const newAds = (report.ads||[]).map(ad => {
+      const newSeries = detectSeries(ad.nama_iklan);
+      if(newSeries !== ad.series){ reportChanged = true; }
+      return { ...ad, series: newSeries };
+    });
+
+    if(reportChanged){
+      changedCount++;
+      const newSummary = computeAdsSummary(newAds);
+      const ref = tenantCollection("iklan_reports").doc(doc.id);
+      batch.set(ref, { ads: newAds, summary: newSummary }, { merge:true });
+      opCount++;
+      if(opCount % 400 === 0){ await batch.commit(); batch = db.batch(); }
+    }
+  }
+  await batch.commit();
+  return changedCount;
 }
 
 // Upload Excel massal: kolom fleksibel, dicari berdasarkan nama header
