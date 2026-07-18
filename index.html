@@ -448,6 +448,7 @@
       <div class="nav-item" data-page="penjualan" onclick="switchPage('penjualan', this)">Data Penjualan</div>
       <div class="nav-item" data-page="iklan" onclick="switchPage('iklan', this)">Data Iklan</div>
       <div class="nav-item" data-page="keuangan" onclick="switchPage('keuangan', this)">Laporan Keuangan</div>
+      <div class="nav-item" data-page="kalkulator" onclick="switchPage('kalkulator', this)">🧮 Kalkulator Harga Jual <span style="font-size:9px; background:var(--blue); color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; vertical-align:middle;">PRO</span></div>
       <div class="nav-item" data-page="faq" onclick="switchPage('faq', this)">Panduan</div>
     </nav>
   </div>
@@ -674,6 +675,7 @@
       <input type="file" id="productSeriesExcelInput" accept=".xlsx,.xls" style="display:none;" onchange="handleProductSeriesExcelUpload(event)">
       <span id="hppSaveStatus" style="font-size:12px; color:var(--text-soft); margin-left:10px;"></span>
       <p style="font-size:11.5px; color:var(--text-soft); margin-top:10px;">Format Excel: 3 kolom dengan header "Nama Produk/Series", "SKU/Kata Kunci", dan "HPP" (urutan kolom bebas, sistem baca dari nama headernya).</p>
+      <div id="hppSaveNote" style="display:none; margin-top:12px; font-size:12.5px; color:#B8791E; background:rgba(232,184,74,.1); border:1px solid rgba(232,184,74,.3); border-radius:8px; padding:10px 14px; line-height:1.6;"></div>
     </div>
 
     <div class="panel cut-corner" id="excludedOrdersPanel" style="display:none; margin-bottom:20px;">
@@ -753,6 +755,50 @@
     </div>
 
   </div><!-- /#page-keuangan -->
+
+  <div id="page-kalkulator" style="display:none;">
+
+    <h2 style="font-family:'Space Grotesk',sans-serif; font-size:20px; margin-bottom:4px;">🧮 Kalkulator Harga Jual</h2>
+    <p style="font-size:13px; color:var(--text-soft); margin-bottom:20px;">Bingung nentuin harga jual? Isi modal & target margin, sistem hitungin harga jual yang pas — lengkap dengan estimasi biaya Shopee dari <strong>data historis toko kamu sendiri</strong> (bukan tebakan).</p>
+
+    <div class="panel cut-corner">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+        <div>
+          <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Pilih Produk (opsional, auto-isi HPP)</label>
+          <select id="kalkProdukSelect" onchange="onKalkProdukChange()" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; margin-bottom:16px;"></select>
+
+          <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">HPP / Modal Produksi (per pcs)</label>
+          <input type="number" id="kalkHpp" placeholder="90000" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; margin-bottom:16px;">
+
+          <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Estimasi Biaya Shopee (%)</label>
+          <input type="number" id="kalkFeePercent" step="0.1" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; margin-bottom:4px;">
+          <p id="kalkFeeHint" style="font-size:11px; color:var(--text-soft); margin:0 0 16px;"></p>
+
+          <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Estimasi Biaya Iklan (%, opsional)</label>
+          <input type="number" id="kalkAdsPercent" value="0" step="0.1" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; margin-bottom:16px;">
+
+          <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Target Margin / Laba (%)</label>
+          <input type="number" id="kalkMarginPercent" value="20" step="0.5" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; margin-bottom:16px;">
+
+          <button class="btn btn-primary" style="width:100%;" onclick="hitungHargaJual()">Hitung Harga Jual</button>
+        </div>
+
+        <div>
+          <div id="kalkResult" style="color:var(--text-soft); font-size:13px; padding:20px; text-align:center; border:1px dashed var(--border); border-radius:12px;">Isi HPP & klik "Hitung Harga Jual" buat lihat hasilnya.</div>
+
+          <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
+            <label style="font-size:12.5px; font-weight:600; color:var(--navy); display:block; margin-bottom:6px;">Atau, cek: kalau dijual di harga ini, berapa labanya?</label>
+            <div style="display:flex; gap:8px;">
+              <input type="number" id="kalkHargaCek" placeholder="150000" style="flex:1; padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+              <button class="btn btn-ghost" style="color:var(--navy); border-color:var(--border);" onclick="cekMarginDiHarga()">Cek</button>
+            </div>
+            <p id="kalkCekResult" style="font-size:13px; margin-top:12px; color:var(--text-soft);"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#page-kalkulator -->
 
   <div id="page-faq" style="display:none;">
 
@@ -1304,11 +1350,13 @@ function switchPage(page, el){
   document.getElementById("page-penjualan").style.display = (page === "penjualan") ? "block" : "none";
   document.getElementById("page-iklan").style.display = (page === "iklan") ? "block" : "none";
   document.getElementById("page-keuangan").style.display = (page === "keuangan") ? "block" : "none";
+  document.getElementById("page-kalkulator").style.display = (page === "kalkulator") ? "block" : "none";
   document.getElementById("page-faq").style.display = (page === "faq") ? "block" : "none";
   if(page === "upload") loadUploadHistory();
   if(page === "penjualan") refreshDashboard();
   if(page === "iklan") initIklanPage();
   if(page === "keuangan") initKeuanganPage();
+  if(page === "kalkulator") initKalkulatorPage();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2170,13 +2218,189 @@ function addProductSeriesRow(){
 async function saveProductSeriesSettings(){
   await saveProductSeriesList();
   const statusEl = document.getElementById("hppSaveStatus");
-  statusEl.textContent = `✅ Tersimpan (${productSeriesList.length} produk/series)`;
-  setTimeout(()=>{ statusEl.textContent = ""; }, 3000);
+  const noteEl = document.getElementById("hppSaveNote");
+  statusEl.innerHTML = `✅ Tersimpan (${productSeriesList.length} produk/series)`;
+
+  noteEl.style.display = "block";
+  noteEl.style.color = "#5C6B85";
+  noteEl.style.background = "var(--surface-2)";
+  noteEl.style.borderColor = "var(--border)";
+  noteEl.textContent = "🔄 Menghitung ulang seluruh data yang sudah ada pakai daftar produk terbaru...";
+
+  try{
+    const result = await reclassifyAllOrders();
+    noteEl.textContent = `✅ Selesai — ${result.changedCount} order dihitung ulang, ${result.affectedDatesCount} hari diperbarui. Semua dashboard sudah otomatis update, tidak perlu upload ulang.`;
+  } catch(err){
+    console.error(err);
+    noteEl.style.color = "#C22945";
+    noteEl.textContent = `❌ Gagal menghitung ulang otomatis: ${err.message}. Coba upload ulang Data Penjualan secara manual sebagai cadangan.`;
+  }
+
   await refreshKeuanganDashboard();
+}
+
+// Hitung ulang SEMUA order yang sudah tersimpan, pakai daftar produk/series
+// dan kata sandi FO TERBARU — tanpa perlu file Excel aslinya lagi, karena semua
+// data yang dibutuhkan (nama produk, SKU, catatan penjual) sudah tersimpan di tiap order.
+async function reclassifyAllOrders(){
+  const snap = await tenantCollection("orders").get();
+  const allOrders = [];
+  snap.forEach(doc => allOrders.push(doc.data()));
+
+  let changedCount = 0;
+  let batch = db.batch();
+  let opCount = 0;
+  const updatedOrders = [];
+
+  for(const order of allOrders){
+    let orderChanged = false;
+    const newItems = (order.items||[]).map(item => {
+      const newSeries = detectSeries(item.nama_produk, item.sku);
+      if(newSeries !== item.series){ orderChanged = true; }
+      return { ...item, series: newSeries };
+    });
+
+    if(orderChanged){
+      changedCount++;
+      const ref = tenantCollection("orders").doc(order.no_pesanan);
+      batch.set(ref, { ...order, items: newItems }, { merge:true });
+      opCount++;
+      if(opCount % 400 === 0){ await batch.commit(); batch = db.batch(); }
+    }
+    updatedOrders.push({ ...order, items: newItems });
+  }
+  await batch.commit();
+
+  // Susun ulang per tanggal pakai item yang SUDAH diperbarui, lalu hitung ulang
+  // daily_summary (ini juga otomatis re-cek kata sandi FO terbaru sekalian).
+  const ordersByDate = {};
+  updatedOrders.forEach(o => {
+    if(!o.waktu_pesanan_dibuat || typeof o.waktu_pesanan_dibuat.toDate !== "function") return;
+    const tgl = fmtLocalDate(o.waktu_pesanan_dibuat.toDate());
+    if(!ordersByDate[tgl]) ordersByDate[tgl] = [];
+    ordersByDate[tgl].push(o);
+  });
+
+  const affectedDates = Object.keys(ordersByDate);
+  for(const tgl of affectedDates){
+    const realOrders = ordersByDate[tgl].filter(o => !isFakeOrder(o));
+    const summary = computeDailySummary(realOrders, tgl);
+    await tenantCollection("daily_summary").doc(tgl).set(summary);
+  }
+
+  return { changedCount, affectedDatesCount: affectedDates.length };
 }
 
 // Upload Excel massal: kolom fleksibel, dicari berdasarkan nama header
 // (Nama Produk/Series, SKU/Kata Kunci, HPP) — bukan posisi kolom tetap.
+/* ═══════════════════════════════════════════════════════
+   KALKULATOR HARGA JUAL — bantu owner nentuin harga jual,
+   pakai persentase biaya Shopee dari DATA HISTORIS toko sendiri
+   (bukan tebakan/asumsi generik).
+═══════════════════════════════════════════════════════ */
+async function initKalkulatorPage(){
+  renderKalkulatorProdukOptions();
+  const hint = document.getElementById("kalkFeeHint");
+  hint.textContent = "Menghitung rata-rata biaya Shopee dari riwayat toko kamu...";
+  const feePercent = await getHistoricalFeePercent();
+  if(feePercent !== null){
+    document.getElementById("kalkFeePercent").value = feePercent.toFixed(1);
+    hint.textContent = `Dihitung otomatis dari rata-rata data historis toko kamu (Admin Shopee + Komisi Affiliate ÷ Total Pendapatan)`;
+  } else {
+    document.getElementById("kalkFeePercent").value = "15";
+    hint.textContent = `Belum ada data Laporan Keuangan — pakai perkiraan umum 15%, bisa diedit manual.`;
+  }
+}
+
+function renderKalkulatorProdukOptions(){
+  const select = document.getElementById("kalkProdukSelect");
+  select.innerHTML = `<option value="">— Manual (isi HPP sendiri) —</option>` +
+    productSeriesList.map(s => `<option value="${s.id}">${s.nama} (HPP: Rp ${(s.hpp||0).toLocaleString("id-ID")})</option>`).join("");
+}
+
+function onKalkProdukChange(){
+  const selectedId = document.getElementById("kalkProdukSelect").value;
+  if(selectedId){
+    const produk = productSeriesList.find(s => s.id === selectedId);
+    document.getElementById("kalkHpp").value = produk ? (produk.hpp||0) : "";
+  }
+}
+
+// Rata-rata persentase Biaya Shopee (Admin+Layanan+Proses+Komisi Affiliate)
+// dibandingkan Total Pendapatan, dihitung dari SELURUH riwayat Laporan Keuangan.
+async function getHistoricalFeePercent(){
+  try{
+    const snap = await tenantCollection("income_reports").get();
+    if(snap.empty) return null;
+    let docs = [];
+    snap.forEach(doc => docs.push(doc.data()));
+    docs = removeOverlappingSubsets(docs);
+    const combined = combineIncomeDocs(docs);
+
+    const biayaAdmin = Math.abs((combined.biaya_administrasi||0) + (combined.biaya_layanan||0) + (combined.biaya_proses_pesanan||0));
+    const komisiAffiliate = Math.abs(combined.biaya_komisi_ams||0);
+    const totalFee = biayaAdmin + komisiAffiliate;
+    const totalPendapatan = combined.total_dilepas + totalFee; // rumus sama seperti kartu "Total Pendapatan"
+
+    if(totalPendapatan <= 0) return null;
+    return (totalFee / totalPendapatan) * 100;
+  }catch(e){ return null; }
+}
+
+function hitungHargaJual(){
+  const hpp = parseFloat(document.getElementById("kalkHpp").value) || 0;
+  const feePercent = parseFloat(document.getElementById("kalkFeePercent").value) || 0;
+  const adsPercent = parseFloat(document.getElementById("kalkAdsPercent").value) || 0;
+  const marginPercent = parseFloat(document.getElementById("kalkMarginPercent").value) || 0;
+  const resultEl = document.getElementById("kalkResult");
+
+  if(hpp <= 0){
+    resultEl.innerHTML = `<p style="color:var(--danger); margin:0;">Isi HPP/Modal Produksi dulu.</p>`;
+    return;
+  }
+  const totalPercent = feePercent + adsPercent + marginPercent;
+  if(totalPercent >= 100){
+    resultEl.innerHTML = `<p style="color:var(--danger); margin:0;">Total persentase (Biaya Shopee + Iklan + Target Margin) sudah ${totalPercent.toFixed(1)}% — nggak mungkin ketemu harga jualnya. Coba kecilkan target margin atau biaya iklan.</p>`;
+    return;
+  }
+
+  const hargaJual = hpp / (1 - totalPercent/100);
+  const biayaShopeeRp = hargaJual * feePercent/100;
+  const biayaIklanRp = hargaJual * adsPercent/100;
+  const labaRp = hargaJual * marginPercent/100;
+
+  resultEl.innerHTML = `
+    <div style="text-align:center; padding:18px; background:var(--blue-pale); border-radius:12px; margin-bottom:14px;">
+      <div style="font-size:11.5px; color:var(--text-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.03em;">Harga Jual yang Disarankan</div>
+      <div style="font-size:28px; font-weight:700; color:var(--navy); font-family:'IBM Plex Mono',monospace;">Rp ${Math.ceil(hargaJual).toLocaleString("id-ID")}</div>
+    </div>
+    <table style="font-size:13px;">
+      <tr><td>HPP (Modal)</td><td class="num mono">Rp ${Math.round(hpp).toLocaleString("id-ID")}</td></tr>
+      <tr><td>Estimasi Biaya Shopee (${feePercent.toFixed(1)}%)</td><td class="num mono">Rp ${Math.round(biayaShopeeRp).toLocaleString("id-ID")}</td></tr>
+      ${adsPercent > 0 ? `<tr><td>Estimasi Biaya Iklan (${adsPercent.toFixed(1)}%)</td><td class="num mono">Rp ${Math.round(biayaIklanRp).toLocaleString("id-ID")}</td></tr>` : ""}
+      <tr style="font-weight:600;"><td>Laba Bersih per pcs (${marginPercent.toFixed(1)}%)</td><td class="num mono" style="color:var(--mint, #18A876);">Rp ${Math.round(labaRp).toLocaleString("id-ID")}</td></tr>
+    </table>`;
+}
+
+function cekMarginDiHarga(){
+  const hpp = parseFloat(document.getElementById("kalkHpp").value) || 0;
+  const feePercent = parseFloat(document.getElementById("kalkFeePercent").value) || 0;
+  const adsPercent = parseFloat(document.getElementById("kalkAdsPercent").value) || 0;
+  const hargaCek = parseFloat(document.getElementById("kalkHargaCek").value) || 0;
+  const resultEl = document.getElementById("kalkCekResult");
+
+  if(hpp <= 0){ resultEl.textContent = "Isi HPP dulu di sebelah kiri."; return; }
+  if(hargaCek <= 0){ resultEl.textContent = "Isi harga yang mau dicek."; return; }
+
+  const biayaShopeeRp = hargaCek * feePercent/100;
+  const biayaIklanRp = hargaCek * adsPercent/100;
+  const labaRp = hargaCek - hpp - biayaShopeeRp - biayaIklanRp;
+  const marginPersen = (labaRp / hargaCek) * 100;
+  const warna = labaRp >= 0 ? "#18A876" : "var(--danger)";
+
+  resultEl.innerHTML = `Di harga <strong>Rp ${hargaCek.toLocaleString("id-ID")}</strong>, laba bersih per pcs kamu: <strong style="color:${warna};">Rp ${Math.round(labaRp).toLocaleString("id-ID")} (margin ${marginPersen.toFixed(1)}%)</strong>`;
+}
+
 function downloadProductSeriesTemplate(){
   const data = [
     ["Nama Produk/Series", "SKU/Kata Kunci", "HPP"],
