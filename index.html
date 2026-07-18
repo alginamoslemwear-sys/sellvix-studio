@@ -4208,7 +4208,12 @@ async function processFileList(files){
       if(result.type.startsWith("Laporan Keuangan") || result.type === "Laporan Saldo") anySuccessKeuangan = true;
 
       if(result.unknownLog && result.unknownLog.length > 0){
-        progressItem.innerHTML += `<br><span style="color:#B8860B; font-size:12px;">⚠️ ${result.unknownLog.length} item tidak ke-mapping ke series manapun</span>`;
+        const detailList = result.unknownLog.map(u => {
+          if(u.nama_produk) return `• [${u.no_pesanan}] ${u.nama_produk}`;
+          if(u.nama_iklan) return `• ${u.nama_iklan}`;
+          return `• ${JSON.stringify(u)}`;
+        }).join("<br>");
+        progressItem.innerHTML += `<br><span style="color:#B8860B; font-size:12px;">⚠️ ${result.unknownLog.length} item tidak ke-mapping ke series manapun:<br>${detailList}</span>`;
       }
     } catch(err){
       console.error(err);
