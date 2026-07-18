@@ -1266,9 +1266,12 @@ function computeDailySummary(orders, tanggal){
   const bySeries = {};
   const kotaCount = {};
   const byProduk = {};
+  let totalProdukTerjual = 0;
 
   for(const o of selesai){
     for(const item of o.items){
+      totalProdukTerjual += item.jumlah;
+
       if(!bySeries[item.series]) bySeries[item.series] = {qty:0, revenue:0, by_warna:{}};
       bySeries[item.series].qty += item.jumlah;
       bySeries[item.series].revenue += item.subtotal;
@@ -1302,6 +1305,7 @@ function computeDailySummary(orders, tanggal){
     order_sedang_dikirim: sedangDikirim.length,
     nilai_sedang_dikirim: sedangDikirimValue,
     cancel_rate: orders.length ? batal.length/orders.length : 0,
+    total_produk_terjual: totalProdukTerjual,
     by_series: bySeries,
     by_produk: byProduk,
     top_kota: topKota,
@@ -3886,6 +3890,7 @@ function renderKPI(days){
   const sedangDikirimValue = days.reduce((s,d)=>s+(d.nilai_sedang_dikirim||0),0);
   const cancelRate = totalOrder ? (batal/totalOrder*100) : 0;
   const aov = selesai ? gmv/selesai : 0;
+  const totalProdukTerjual = days.reduce((s,d)=>s+(d.total_produk_terjual||0),0);
 
   const cards = [
     {label:"GMV", value:`Rp ${gmv.toLocaleString("id-ID")}`, sub:`${days.length} hari`},
@@ -3895,6 +3900,7 @@ function renderKPI(days){
     {label:"Order Batal", value:batal, sub:"", warn:true},
     {label:"Cancel Rate", value:`${cancelRate.toFixed(1)}%`, sub:"", warn: cancelRate > 15},
     {label:"AOV", value:`Rp ${Math.round(aov).toLocaleString("id-ID")}`, sub:"rata-rata/order"},
+    {label:"Total Produk Terjual", value:totalProdukTerjual.toLocaleString("id-ID"), sub:"unit, dari pesanan Selesai"},
   ];
 
   document.getElementById("kpiGrid").innerHTML = cards.map(c=>`
