@@ -541,8 +541,35 @@
         <tbody id="topCitiesBody"></tbody>
       </table>
     </div>
+  <div class="panel cut-corner" style="margin-top:20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <h3 style="margin:0;">Detail Semua Produk Terjual</h3>
+      <span id="produkDetailCount" style="font-size:12px; color:var(--text-soft);"></span>
+    </div>
+    <div class="accent-cut"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+      <input type="text" id="produkDetailSearch" placeholder="Cari nama produk / warna / SKU..." style="flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px;">
+      <select id="produkDetailSeriesFilter" style="padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px;">
+        <option value="">Semua Series</option>
+      </select>
+      <select id="produkDetailSort" style="padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px;">
+        <option value="qty">Urutkan: Qty tertinggi</option>
+        <option value="revenue">Urutkan: Revenue tertinggi</option>
+        <option value="nama">Urutkan: Nama Produk (A-Z)</option>
+      </select>
+    </div>
+    <div style="max-height:480px; overflow-y:auto;">
+      <table>
+        <thead><tr><th>Nama Produk</th><th>Series</th><th>Warna</th><th>SKU</th><th class="num">Qty</th><th class="num">Revenue</th></tr></thead>
+        <tbody id="produkDetailBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size:11px; color:var(--text-soft); margin-top:12px;">
+      Rincian per nama produk asli dari file Shopee (bukan cuma per series), untuk periode yang dipilih di atas. Data lama akan otomatis lengkap setelah kamu klik "💾 Simpan Semua" sekali di menu Laporan Keuangan &gt; Setting Produk &amp; HPP.
+    </p>
   </div>
   </div><!-- /#page-penjualan -->
+
 
   <div id="page-iklan" style="display:none;">
 
@@ -1236,6 +1263,7 @@ function computeDailySummary(orders, tanggal){
 
   const bySeries = {};
   const kotaCount = {};
+  const byProduk = {};
 
   for(const o of selesai){
     for(const item of o.items){
@@ -1246,6 +1274,15 @@ function computeDailySummary(orders, tanggal){
       if(!bySeries[item.series].by_warna[w]) bySeries[item.series].by_warna[w] = {qty:0, revenue:0};
       bySeries[item.series].by_warna[w].qty += item.jumlah;
       bySeries[item.series].by_warna[w].revenue += item.subtotal;
+
+      // Agregasi per nama produk ASLI (bukan cuma per series) — dipakai di tabel
+      // "Detail Semua Produk Terjual" biar bisa lihat & filter sampai level produk.
+      const produkKey = (item.nama_produk||"(Tanpa Nama)") + "|" + w;
+      if(!byProduk[produkKey]){
+        byProduk[produkKey] = { nama_produk: item.nama_produk||"(Tanpa Nama)", warna:w, series:item.series, sku:item.sku||"", qty:0, revenue:0 };
+      }
+      byProduk[produkKey].qty += item.jumlah;
+      byProduk[produkKey].revenue += item.subtotal;
     }
     kotaCount[o.kota] = (kotaCount[o.kota]||0) + 1;
   }
@@ -1264,6 +1301,7 @@ function computeDailySummary(orders, tanggal){
     nilai_sedang_dikirim: sedangDikirimValue,
     cancel_rate: orders.length ? batal.length/orders.length : 0,
     by_series: bySeries,
+    by_produk: byProduk,
     top_kota: topKota,
     updated_at: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -3699,6 +3737,7 @@ async function refreshDashboard(){
   try { renderTrendChart(days); } catch(e){ console.error("renderTrendChart error:", e); }
   try { renderSeriesChart(days); } catch(e){ console.error("renderSeriesChart error:", e); }
   try { renderTopProducts(days); } catch(e){ console.error("renderTopProducts error:", e); }
+  try { renderProductDetailTable(days); } catch(e){ console.error("renderProductDetailTable error:", e); }
   try { renderTopCities(days); } catch(e){ console.error("renderTopCities error:", e); }
   try { await renderAutoInsights(days, from, to); } catch(e){ console.error("renderAutoInsights error:", e); }
 }
@@ -3832,6 +3871,8 @@ function renderEmptyState(){
   });
   document.getElementById("topProductsBody").innerHTML = "";
   document.getElementById("topCitiesBody").innerHTML = "";
+  document.getElementById("produkDetailBody").innerHTML = "";
+  document.getElementById("produkDetailCount").textContent = "";
 }
 
 function renderKPI(days){
@@ -3956,6 +3997,87 @@ function renderTopCities(days){
     <tr><td>${r.kota}</td><td class="num mono">${r.jumlah_order}</td></tr>`).join("")
     || `<tr><td colspan="2" style="text-align:center; color:var(--ink-soft);">Belum ada data</td></tr>`;
 }
+
+/* ═══════════════════════════════════════════════════════
+   DETAIL SEMUA PRODUK TERJUAL — tabel lengkap (tanpa batas 10)
+   per NAMA PRODUK ASLI dari file Shopee, bisa dicari & difilter.
+   Sumber: field by_produk di tiap dokumen daily_summary.
+═══════════════════════════════════════════════════════ */
+let produkDetailRows = []; // cache hasil agregasi periode aktif, dipakai ulang saat filter berubah
+
+function aggregateProdukDetail(days){
+  const agg = {};
+  let hasAnyByProduk = false;
+  days.forEach(d=>{
+    if(d.by_produk) hasAnyByProduk = true;
+    Object.values(d.by_produk||{}).forEach(p=>{
+      const key = p.nama_produk+"|"+p.warna+"|"+p.series;
+      if(!agg[key]) agg[key] = { nama_produk:p.nama_produk, warna:p.warna, series:p.series, sku:p.sku, qty:0, revenue:0 };
+      agg[key].qty += p.qty;
+      agg[key].revenue += p.revenue;
+    });
+  });
+  return { rows: Object.values(agg), hasAnyByProduk };
+}
+
+function renderProductDetailTable(days){
+  const { rows, hasAnyByProduk } = aggregateProdukDetail(days);
+  produkDetailRows = rows;
+
+  // Isi ulang opsi filter Series berdasarkan data yang ada
+  const seriesSelect = document.getElementById("produkDetailSeriesFilter");
+  const currentSeriesVal = seriesSelect.value;
+  const seriesCodes = Array.from(new Set(rows.map(r=>r.series))).sort();
+  seriesSelect.innerHTML = `<option value="">Semua Series</option>` +
+    seriesCodes.map(code=>`<option value="${code}">${SERIES_LABEL[code]||code}</option>`).join("");
+  if(seriesCodes.includes(currentSeriesVal)) seriesSelect.value = currentSeriesVal;
+
+  const emptyMsg = hasAnyByProduk
+    ? "Tidak ada produk yang cocok dengan pencarian/filter."
+    : `Data detail produk belum tersedia untuk periode ini (file lama). Klik "💾 Simpan Semua" sekali di menu Laporan Keuangan &gt; Setting Produk &amp; HPP untuk melengkapi data lama.`;
+
+  applyProdukDetailFilter(emptyMsg);
+}
+
+function applyProdukDetailFilter(emptyMsgOverride){
+  const search = (document.getElementById("produkDetailSearch").value||"").toLowerCase().trim();
+  const seriesFilter = document.getElementById("produkDetailSeriesFilter").value;
+  const sortBy = document.getElementById("produkDetailSort").value;
+
+  let rows = produkDetailRows.filter(r=>{
+    if(seriesFilter && r.series !== seriesFilter) return false;
+    if(search){
+      const haystack = (r.nama_produk+" "+r.warna+" "+(r.sku||"")).toLowerCase();
+      if(!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if(sortBy === "revenue") rows.sort((a,b)=>b.revenue-a.revenue);
+  else if(sortBy === "nama") rows.sort((a,b)=>a.nama_produk.localeCompare(b.nama_produk));
+  else rows.sort((a,b)=>b.qty-a.qty);
+
+  document.getElementById("produkDetailCount").textContent = `${rows.length} produk`;
+  document.getElementById("produkDetailBody").innerHTML = rows.map(r=>`
+    <tr>
+      <td>${r.nama_produk}</td>
+      <td><span class="swatch" style="background:${SERIES_COLOR[r.series]||'#999'}"></span>${SERIES_LABEL[r.series]||r.series}</td>
+      <td>${r.warna}</td>
+      <td class="mono" style="font-size:11px; color:var(--text-soft);">${r.sku||"-"}</td>
+      <td class="num mono">${r.qty}</td>
+      <td class="num mono">Rp ${r.revenue.toLocaleString("id-ID")}</td>
+    </tr>`).join("")
+    || `<tr><td colspan="6" style="text-align:center; color:var(--ink-soft);">${emptyMsgOverride||"Belum ada data"}</td></tr>`;
+}
+
+["produkDetailSearch","produkDetailSeriesFilter","produkDetailSort"].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el){
+    el.addEventListener("input", ()=>applyProdukDetailFilter());
+    el.addEventListener("change", ()=>applyProdukDetailFilter());
+  }
+});
+
 
 /* ═══════════════════════════════════════════════════════
    CHATBOT BANTUAN — FAQ per kategori menu + eskalasi ke WhatsApp Admin
