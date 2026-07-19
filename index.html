@@ -290,6 +290,19 @@
   }
   .empty-state h3{ color:var(--navy); margin-bottom:8px; }
 
+  .ai-msg{
+    max-width:78%; padding:11px 15px; border-radius:14px; font-size:13.5px; line-height:1.5; white-space:pre-wrap;
+  }
+  .ai-msg-user{
+    align-self:flex-end; background:var(--blue); color:#fff; border-bottom-right-radius:3px;
+  }
+  .ai-msg-bot{
+    align-self:flex-start; background:#f0f2f6; color:var(--ink); border-bottom-left-radius:3px;
+  }
+  .ai-msg-loading{
+    align-self:flex-start; background:#f0f2f6; color:var(--text-soft); font-style:italic;
+  }
+
   footer{ text-align:center; padding:22px; font-size:11.5px; color:var(--text-soft); }
 
   @media(max-width:960px){
@@ -449,6 +462,7 @@
       <div class="nav-item" data-page="iklan" onclick="switchPage('iklan', this)">Data Iklan</div>
       <div class="nav-item" data-page="keuangan" onclick="switchPage('keuangan', this)">Laporan Keuangan</div>
       <div class="nav-item" data-page="kalkulator" onclick="switchPage('kalkulator', this)">🧮 Kalkulator Harga Jual <span style="font-size:9px; background:var(--blue); color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; vertical-align:middle;">PRO</span></div>
+      <div class="nav-item" data-page="ai-konsultan" onclick="switchPage('ai-konsultan', this)">💬 AI Bisnis Konsultan <span style="font-size:9px; background:var(--blue); color:#fff; padding:2px 6px; border-radius:8px; margin-left:4px; vertical-align:middle;">PRO</span></div>
       <div class="nav-item" data-page="faq" onclick="switchPage('faq', this)">Panduan</div>
     </nav>
   </div>
@@ -828,6 +842,38 @@
     </div>
 
   </div><!-- /#page-kalkulator -->
+
+  <div id="page-ai-konsultan" style="display:none;">
+
+    <h2 style="font-family:'Space Grotesk',sans-serif; font-size:20px; margin-bottom:4px;">💬 AI Bisnis Konsultan</h2>
+    <p style="font-size:13px; color:var(--text-soft); margin-bottom:16px;">Ngobrol soal bisnis Shopee kamu — AI ini baca data toko kamu sendiri (GMV, tren, margin, iklan) DAN bisa cari referensi dari internet (tren pasar, kompetitor, dsb).</p>
+
+    <div id="aiKonsultanLocked" class="empty-state" style="display:none;">
+      <h3>🔒 Fitur PRO</h3>
+      <p>AI Bisnis Konsultan cuma tersedia buat akun PRO. Hubungi Admin Sellvix Studio buat upgrade.</p>
+    </div>
+
+    <div id="aiKonsultanContent" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <span id="aiQuotaLabel" style="font-size:12.5px; color:var(--text-soft);"></span>
+        <button class="btn btn-ghost" style="font-size:11px; padding:5px 10px;" onclick="clearAiChatSession()">🗑️ Chat Baru</button>
+      </div>
+
+      <div class="panel cut-corner" style="padding:0; overflow:hidden;">
+        <div id="aiChatMessages" style="height:440px; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:14px;">
+          <div class="ai-msg ai-msg-bot">
+            Halo! Saya AI Konsultan Sellvix. Tanya apa aja soal performa toko kamu — GMV, margin, series mana yang paling untung, sampai perbandingan sama tren pasar sekarang. Ada yang mau dibahas?
+          </div>
+        </div>
+        <div style="border-top:1px solid var(--border); padding:14px 16px; display:flex; gap:10px; background:#fafbfc;">
+          <input type="text" id="aiChatInput" placeholder="Tanya sesuatu soal bisnis kamu..." style="flex:1; padding:10px 14px; border-radius:20px; border:1px solid var(--border); font-size:13.5px;" onkeydown="if(event.key==='Enter') sendAiChatMessage();">
+          <button class="btn btn-primary" style="border-radius:20px; padding:10px 20px;" id="aiChatSendBtn" onclick="sendAiChatMessage()">Kirim</button>
+        </div>
+      </div>
+      <p style="font-size:11px; color:var(--text-soft); margin-top:10px;">Kuota chat direset tiap awal bulan. AI ini menyimpan ringkasan pembahasan (bukan transkrip lengkap) biar tetap nyambung kalau kamu buka lagi lain waktu.</p>
+    </div>
+
+  </div><!-- /#page-ai-konsultan -->
 
   <div id="page-faq" style="display:none;">
 
@@ -1316,12 +1362,134 @@ function computeDailySummary(orders, tanggal){
 /* ═══════════════════════════════════════════════════════
    UPLOAD HANDLER
 ═══════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────
+   PARSER BIGSELLER — untuk file "Order Package" export dari
+   BigSeller (tools pihak ketiga), BUKAN file native Shopee.
+   Beda utama dari native:
+   - 1 baris = 1 PAKET (bisa multi-produk, semua field per-item
+     digabung dalam 1 sel dipisah "\r\n"), bukan 1 baris = 1 item.
+   - Nama kolom beda ("Nomor Pesanan" bukan "No. Pesanan", dst).
+   - Vocab status pesanan beda ("Sudah Dikirim" bukan "Sedang
+     Dikirim", dst) — perlu dipetakan ke vocab internal.
+───────────────────────────────────────────────────────── */
+const BULAN_MAP_BIGSELLER = {
+  jan:0, feb:1, mar:2, apr:3, mei:4, may:4, jun:5, jul:6,
+  agu:7, aug:7, sep:8, okt:9, oct:9, nov:10, des:11, dec:11,
+};
+function parseTanggalBigSeller(v){
+  if(!v) return null;
+  // Format BigSeller: "18 Jul 2026 23:44"
+  const m = String(v).trim().match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})\s+(\d{1,2}):(\d{2})/);
+  if(!m) return null;
+  const [, day, bulanStr, year, hour, minute] = m;
+  const bulanIdx = BULAN_MAP_BIGSELLER[bulanStr.toLowerCase().slice(0,3)];
+  if(bulanIdx === undefined) return null;
+  const d = new Date(parseInt(year,10), bulanIdx, parseInt(day,10), parseInt(hour,10), parseInt(minute,10));
+  return isNaN(d.getTime()) ? null : firebase.firestore.Timestamp.fromDate(d);
+}
+
+function splitMultiValueBigSeller(raw){
+  if(raw===null || raw===undefined) return [];
+  return String(raw).split(/\r\n/).map(s=>s.trim()).filter(s=>s!=="");
+}
+
+// Mapping status BigSeller -> vocab status internal (sama dgn yg dipakai
+// parser native: "Selesai" / "Batal" / "Sedang Dikirim"). Cuma 2 nilai yang
+// KEKONFIRMASI dari sample data ("Menunggu Diproses","Sudah Dikirim") — nilai
+// lain (misal utk "Dibatalkan") ditebak best-effort dan PERLU DIVALIDASI kalau
+// muncul di data asli. Status yang nggak ke-mapping dibiarkan apa adanya:
+// tetap kehitung di Total Order, tapi nggak masuk bucket Selesai/Batal/
+// Sedang Dikirim — sama seperti perlakuan status asing di parser native.
+const STATUS_MAP_BIGSELLER = {
+  "selesai": "Selesai",
+  "sudah dikirim": "Sedang Dikirim",
+  "dikirim": "Sedang Dikirim",
+  "dibatalkan": "Batal",
+  "batal": "Batal",
+  "dibatalkan pembeli": "Batal",
+  "dibatalkan sistem": "Batal",
+};
+function mapStatusBigSeller(raw){
+  const key = String(raw||"").toLowerCase().trim();
+  return STATUS_MAP_BIGSELLER[key] || raw || "";
+}
+
+function parseWorkbookBigSeller(arrayBuffer, sourceFile){
+  const wb = XLSX.read(arrayBuffer, {type:"array", raw:false});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+
+  const ordersMap = new Map();
+  const unknownLog = [];
+
+  for(const row of rows){
+    const noPesanan = row["Nomor Pesanan"] ? String(row["Nomor Pesanan"]).trim() : null;
+    if(!noPesanan) continue;
+
+    // Tiap sel produk digabung banyak item dipisah \r\n — pecah dulu semua
+    // kolom per-item, baru di-zip jadi array `items` berdasarkan urutan.
+    const namaProdukList = splitMultiValueBigSeller(row["Nama Produk"]);
+    const skuList = splitMultiValueBigSeller(row["SKU"]);
+    const warnaList = splitMultiValueBigSeller(row["Nama Variasi"]);
+    const jumlahList = splitMultiValueBigSeller(row["Jumlah"]);
+    const hargaAwalList = splitMultiValueBigSeller(row["Harga Awal Produk"]);
+    const hargaSatuanList = splitMultiValueBigSeller(row["Harga Satuan"]);
+    const subtotalList = splitMultiValueBigSeller(row["Subtotal Produk"]);
+
+    const n = namaProdukList.length || 1;
+    const items = [];
+    for(let i=0; i<n; i++){
+      const namaProduk = namaProdukList[i] || "";
+      const sku = skuList[i] || "";
+      const series = detectSeries(namaProduk, sku);
+      if(series === "UNKNOWN") unknownLog.push({no_pesanan:noPesanan, nama_produk:namaProduk});
+      items.push({
+        nama_produk: namaProduk,
+        sku,
+        series,
+        warna: warnaList[i] || "",
+        jumlah: parseIntSafe(jumlahList[i]),
+        harga_awal: parseRupiah(hargaAwalList[i]),
+        harga_setelah_diskon: parseRupiah(hargaSatuanList[i]),
+        subtotal: parseRupiah(subtotalList[i]),
+        returned_quantity: 0, // BigSeller export nggak ada kolom returned qty
+      });
+    }
+
+    ordersMap.set(noPesanan, {
+      no_pesanan: noPesanan,
+      status: mapStatusBigSeller(row["Status Pesanan"]),
+      alasan_pembatalan: row["Alasan Pembatalan"] || null,
+      waktu_pesanan_dibuat: parseTanggalBigSeller(row["Waktu Pesanan Dibuat"]),
+      waktu_pembayaran: parseTanggalBigSeller(row["Waktu Pesanan Dibayar"]),
+      waktu_pesanan_selesai: parseTanggalBigSeller(row["Waktu Selesai"]),
+      metode_pembayaran: row["Metode Pembayaran"] || "",
+      opsi_pengiriman: row["Nama Jasa Kirim"] || "",
+      no_resi: row["Nomor Resi"] || "",
+      kota: row["Kabupaten/Kota"] || "",
+      provinsi: row["Provinsi"] || "",
+      total_pembayaran: parseRupiah(row["Total Pesanan"]),
+      ongkos_kirim_dibayar_pembeli: parseRupiah(row["Ongkos Kirim"]),
+      total_berat_gr: parseBerat(row["Berat Paket(g)"]),
+      catatan_pembeli: row["Pesan dari Pembeli"] || "",
+      catatan_penjual: row["Catatan Penjual"] || "",
+      items,
+      source_file: sourceFile,
+      imported_at: firebase.firestore.Timestamp.now(),
+    });
+  }
+
+  return { orders: Array.from(ordersMap.values()), unknownLog };
+}
+
 // Fungsi inti pemrosesan file Order (dipanggil dari Upload Zone).
 // Tidak menyentuh elemen DOM spesifik menu — cukup proses & simpan ke Firestore,
 // mengembalikan ringkasan hasilnya.
-async function processOrderFile(file){
+// parserFn: parseWorkbook (native Shopee, default) atau parseWorkbookBigSeller.
+async function processOrderFile(file, parserFn = parseWorkbook, sourceLabel = "Shopee"){
   const buffer = await file.arrayBuffer();
-  const {orders, unknownLog} = parseWorkbook(buffer, file.name);
+  const {orders, unknownLog} = parserFn(buffer, file.name);
 
   // batch write orders (max 500 per batch)
   let batch = db.batch();
@@ -1369,7 +1537,7 @@ async function processOrderFile(file){
 
   return {
     type: "Data Penjualan",
-    detail: `${orders.length - totalFoCount} order, ${rangeInfo}, GMV Rp ${totalGmv.toLocaleString("id-ID")}${foInfo}`,
+    detail: `[${sourceLabel}] ${orders.length - totalFoCount} order, ${rangeInfo}, GMV Rp ${totalGmv.toLocaleString("id-ID")}${foInfo}`,
     unknownLog,
   };
 }
@@ -1395,12 +1563,14 @@ function switchPage(page, el){
   document.getElementById("page-iklan").style.display = (page === "iklan") ? "block" : "none";
   document.getElementById("page-keuangan").style.display = (page === "keuangan") ? "block" : "none";
   document.getElementById("page-kalkulator").style.display = (page === "kalkulator") ? "block" : "none";
+  document.getElementById("page-ai-konsultan").style.display = (page === "ai-konsultan") ? "block" : "none";
   document.getElementById("page-faq").style.display = (page === "faq") ? "block" : "none";
   if(page === "upload") loadUploadHistory();
   if(page === "penjualan") refreshDashboard();
   if(page === "iklan") initIklanPage();
   if(page === "keuangan") initKeuanganPage();
   if(page === "kalkulator") initKalkulatorPage();
+  if(page === "ai-konsultan") initAiKonsultanPage();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2478,6 +2648,148 @@ function cekMarginDiHarga(){
 
   resultEl.innerHTML = `Di harga <strong>Rp ${hargaCek.toLocaleString("id-ID")}</strong>, laba bersih per pcs kamu: <strong style="color:${warna};">Rp ${Math.round(labaRp).toLocaleString("id-ID")} (margin ${marginPersen.toFixed(1)}%)</strong>`;
 }
+
+/* ═══════════════════════════════════════════════════════
+   AI BISNIS KONSULTAN — chat 2 arah dgn AI (fitur PRO).
+   Backend-nya di Netlify Function (netlify/functions/ai-consultant.js)
+   — API key & kuota TIDAK PERNAH ada di sisi browser ini.
+   Riwayat chat cuma disimpan di memory browser SELAMA SESI (hilang
+   kalau refresh), tapi tiap sesi berakhir, ringkasan pembahasan
+   dikirim ke server buat disimpan permanen (tenants/{uid}/ai_memory)
+   biar AI tetap "inget" tema yang pernah dibahas di sesi berikutnya.
+═══════════════════════════════════════════════════════ */
+const AI_CONSULTANT_ENDPOINT = "/.netlify/functions/ai-consultant";
+const AI_SUMMARIZE_ENDPOINT = "/.netlify/functions/ai-consultant-summarize";
+let aiChatSessionHistory = []; // [{role:"user"|"assistant", content:"..."}] — cuma sesi ini, direset kalau "Chat Baru"
+let aiChatBusy = false;
+let cachedIdTokenForBeacon = null; // token Firebase ID di-cache biar bisa dipakai di beforeunload (sendBeacon nggak bisa async)
+
+async function initAiKonsultanPage(){
+  const lockedEl = document.getElementById("aiKonsultanLocked");
+  const contentEl = document.getElementById("aiKonsultanContent");
+  try{
+    const tenantDoc = await db.collection("tenants").doc(currentUid).get();
+    const tenantData = tenantDoc.data() || {};
+    if(tenantData.tier !== "pro"){
+      lockedEl.style.display = "block";
+      contentEl.style.display = "none";
+      return;
+    }
+    lockedEl.style.display = "none";
+    contentEl.style.display = "block";
+    await refreshAiQuotaLabel(tenantData);
+  } catch(e){
+    console.error("initAiKonsultanPage error:", e);
+    lockedEl.style.display = "block";
+    lockedEl.querySelector("p").textContent = "Gagal memuat status akun. Coba refresh halaman.";
+    contentEl.style.display = "none";
+  }
+}
+
+async function refreshAiQuotaLabel(tenantData){
+  const quota = tenantData.ai_quota || {};
+  const limit = quota.limit || 100;
+  const used = quota.count || 0;
+  document.getElementById("aiQuotaLabel").textContent = `Kuota chat bulan ini: ${used}/${limit} terpakai`;
+}
+
+function appendAiChatBubble(role, text){
+  const wrap = document.getElementById("aiChatMessages");
+  const div = document.createElement("div");
+  div.className = "ai-msg " + (role === "user" ? "ai-msg-user" : "ai-msg-bot");
+  div.textContent = text;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+function clearAiChatSession(){
+  aiChatSessionHistory = [];
+  const wrap = document.getElementById("aiChatMessages");
+  wrap.innerHTML = `<div class="ai-msg ai-msg-bot">Oke, mulai obrolan baru. Ringkasan pembahasan sebelumnya tetap saya ingat kok — ada yang mau dibahas?</div>`;
+}
+
+async function sendAiChatMessage(){
+  if(aiChatBusy) return;
+  const input = document.getElementById("aiChatInput");
+  const message = input.value.trim();
+  if(!message) return;
+
+  input.value = "";
+  appendAiChatBubble("user", message);
+  aiChatSessionHistory.push({role:"user", content:message});
+
+  aiChatBusy = true;
+  document.getElementById("aiChatSendBtn").disabled = true;
+  const loadingEl = document.createElement("div");
+  loadingEl.className = "ai-msg ai-msg-loading";
+  loadingEl.textContent = "AI sedang mikir...";
+  document.getElementById("aiChatMessages").appendChild(loadingEl);
+  document.getElementById("aiChatMessages").scrollTop = 999999;
+
+  try{
+    const idToken = await firebase.auth().currentUser.getIdToken();
+    cachedIdTokenForBeacon = idToken;
+    const res = await fetch(AI_CONSULTANT_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        message,
+        // kirim histori sesi ini aja (maks 10 turn terakhir) — cukup buat konteks
+        // percakapan berjalan, nggak perlu kirim ulang seluruh riwayat lama krn
+        // itu sudah dibawa server lewat ringkasan memori tenant.
+        history: aiChatSessionHistory.slice(-20, -1),
+      }),
+    });
+
+    loadingEl.remove();
+
+    if(res.status === 429){
+      const data = await res.json().catch(()=>({}));
+      appendAiChatBubble("assistant", data.message || "Kuota chat bulan ini sudah habis. Kuota reset tiap awal bulan.");
+      return;
+    }
+    if(res.status === 403){
+      appendAiChatBubble("assistant", "Fitur ini khusus akun PRO. Hubungi Admin Sellvix Studio buat upgrade.");
+      return;
+    }
+    if(!res.ok){
+      const data = await res.json().catch(()=>({}));
+      throw new Error(data.error || `Server error (${res.status})`);
+    }
+
+    const data = await res.json();
+    appendAiChatBubble("assistant", data.reply);
+    aiChatSessionHistory.push({role:"assistant", content:data.reply});
+
+    if(typeof data.quota_used === "number" && typeof data.quota_limit === "number"){
+      document.getElementById("aiQuotaLabel").textContent = `Kuota chat bulan ini: ${data.quota_used}/${data.quota_limit} terpakai`;
+    }
+  } catch(e){
+    loadingEl.remove();
+    console.error("sendAiChatMessage error:", e);
+    appendAiChatBubble("assistant", "Maaf, ada gangguan koneksi ke AI Konsultan. Coba lagi sebentar.");
+  } finally {
+    aiChatBusy = false;
+    document.getElementById("aiChatSendBtn").disabled = false;
+  }
+}
+
+// Kirim ringkasan sesi ke server buat disimpan ke memori tenant, dipanggil
+// pas user pindah halaman / tutup tab — biar AI "inget" tema yg pernah dibahas.
+// Pakai idToken yg di-cache (bukan uid mentah) supaya backend bisa verifikasi
+// beneran — sendBeacon nggak bisa set header Authorization, jadi token dikirim
+// di body request-nya sekalian.
+window.addEventListener("beforeunload", () => {
+  if(aiChatSessionHistory.length === 0 || !cachedIdTokenForBeacon) return;
+  try{
+    const payload = JSON.stringify({ idToken: cachedIdTokenForBeacon, history: aiChatSessionHistory.slice(-20) });
+    navigator.sendBeacon(AI_SUMMARIZE_ENDPOINT, new Blob([payload], {type:"application/json"}));
+  } catch(e){ /* best-effort, nggak masalah kalau gagal */ }
+});
 
 function downloadProductSeriesTemplate(){
   const data = [
@@ -4307,6 +4619,11 @@ async function detectAndProcessFile(file){
   const headerRow = rows[0] || [];
   if(headerRow.includes("No. Pesanan") && headerRow.includes("Status Pesanan")){
     return await processOrderFile(file);
+  }
+  // File "Order Package" dari BigSeller (tools pihak ketiga) — header & struktur
+  // beda dari native Shopee (1 baris = 1 paket, bukan 1 baris = 1 item).
+  if(headerRow.includes("Nomor Pesanan") && headerRow.includes("Status Pesanan")){
+    return await processOrderFile(file, parseWorkbookBigSeller, "BigSeller");
   }
 
   throw new Error("Jenis file tidak dikenali — pastikan file yang diupload adalah Order All, Laporan Iklan, Laporan Penghasilan, atau Laporan Saldo dari Shopee.");
