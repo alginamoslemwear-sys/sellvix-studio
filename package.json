@@ -1,0 +1,8 @@
+{
+  "name": "sellvix-ai-functions",
+  "private": true,
+  "description": "Dependency untuk Netlify Functions Sellvix AI (fitur AI Bisnis Konsultan). Kalau repo kamu sudah punya package.json, gabungkan bagian 'dependencies' di bawah ini ke package.json yang sudah ada, jangan timpa filenya.",
+  "dependencies": {
+    "firebase-admin": "^12.1.0"
+  }
+}
